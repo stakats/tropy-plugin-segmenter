@@ -6,7 +6,7 @@ document-level items — in place, inside Tropy.
 This is the self-contained shape described in [`docs/tropy.md`](docs/tropy.md):
 the plugin calls a model itself, so it needs no Claude Code and no operator.
 
-The judgement lives in two policy files at the repository root, inlined as the
+The judgment lives in two policy files at the repository root, inlined as the
 prompt at build time:
 
 | | |
@@ -242,7 +242,7 @@ wanted later, it belongs in its own field, marked as derived.
 ## Where this is going
 
 Today the plugin runs one direction: one item holding many documents, split
-into many items. The judgement it makes — which of these pages belong together
+into many items. The judgment it makes — which of these pages belong together
 as one document — is the same in the other direction, where a group of
 separately imported scans should be *joined* into the documents they came from.
 That is why it is called a segmenter rather than a splitter; the mechanics
