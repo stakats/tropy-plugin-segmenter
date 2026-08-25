@@ -36,54 +36,34 @@ Photos are reassigned, never duplicated. The batch item survives as an empty
 dossier shell holding the dossier-level record, and every step registers in
 Tropy's undo history. Covers, labels and color targets stay on the shell.
 
-## Building
-
-```bash
-npm install && npm run build
-```
-
-`npm run build` inlines `segmentation.md`, `metadata.md` and
-`segmentation.json` into the bundle, so **revising a policy means rebuilding
-the plugin**. That is the intended workflow: the policies are expected to change
-far more often than the code.
-
 ## Installing
 
-```bash
-npm run dist
-```
+Download the `.zip` from the [latest release][releases], then in Tropy:
 
-That writes `dist/tropy-plugin-segmenter-0.1.0.zip`, which is what Tropy
-installs: Preferences → Plugins → Install Plugin, and pick the zip.
+1. **Preferences → Plugins → Install Plugin**, and choose the zip.
+2. Click **+** on the plugin to add an instance and give it a name. That name
+   is what appears in the menu, so something like `Segment` reads well.
+3. Open its **Settings** and paste an [Anthropic API key][key]. Nothing else is
+   required — the rest of the options have working defaults.
 
-The bundle is self-contained — no `require`, no `node_modules`, no `src` — so
-the zip carries only `index.js`, `package.json`, `icon.svg`, `LICENSE` and
-`third-party-licenses.txt`. Tropy never installs a plugin's dependencies, which
-is why `@anthropic-ai/sdk` is a *dev* dependency here: rollup inlines it.
+Then select a batch-scanned item and **right-click → Export Item →** your
+instance name. Nothing is exported: Tropy has no segmentation hook, and plugins
+can only appear in the import, export, extract and transcribe menus, so the
+export menu is the only place an item-scoped action can live.
 
-The zip must be named `<name>-<version>.zip` and hold one folder of the same
-name. Do not prefix the version with `v`: Tropy strips a trailing `-1.2.3` from
-the filename to name the installed folder, and that pattern only matches a dash
-followed by digits — `-v0.1.0` would survive into the folder name.
+**Turn Dry run on for your first go.** It reports what it would do and changes
+nothing.
 
-During development you can skip the zip and copy `index.js`, `package.json` and
-`icon.svg` straight into the plugins folder.
+A run costs money, because it sends the pages to Anthropic. The confirmation
+dialog shows an estimate before anything is spent and the report shows what it
+actually cost — roughly a cent a page, or **$0.23** for a 24-page dossier
+through Claude Opus 5.
 
-**Tropy must be fully quit and relaunched to pick up a new build.** Plugins are
-loaded with a plain `import(spec.main)` and the ES module cache is keyed by URL,
-so replacing `index.js` at the same path changes nothing until the process
-restarts — and reinstalling through the UI does not help, because the path is
-the same.
+> Replacing an existing install needs Tropy to be **fully quit and relaunched**;
+> a first install does not. See *Developing* for why.
 
-Bump the version on every change — `npm run bump` — so the build that is
-actually loaded can be read off Preferences → Plugins, which shows
-`productName` and `version`.
-
-There is a catch that makes this worth stating precisely: the version comes
-from a **rescan** of `package.json`, while the code comes from the **module
-cache**. A plugins reload without an app restart rescans the spec but re-uses
-the cached module, so the panel would show the new version while the old code
-is still running. Always restart, and the two agree.
+[releases]: https://github.com/stakats/tropy-plugin-segmenter/releases
+[key]: https://console.anthropic.com/settings/keys
 
 ## Options
 
@@ -122,27 +102,25 @@ answered with the ids that would have worked.
 
 ## Using it
 
-After installing, **add an instance** in Preferences → Plugins with the `+`
-button, and give it a name — "Segment" reads well. This step is easy to miss
-and is what makes the plugin appear in menus at all: Tropy builds the menu from
-`config.json`, not from what is installed, so a plugin with no instance is
-invisible. The menu label is that name, not the plugin's `productName`.
+Select one batch-scanned item and **right-click → Export Item →** your instance
+name, at the bottom of the submenu after a separator. A multi-selection puts it
+under "Export Selected Items"; the plugin refuses anything other than exactly
+one item. File → Export is the same action.
 
-Then select one batch-scanned item and **right-click → Export Item →** your
-instance name, at the bottom of the submenu after a separator. A multi-selection
-puts it under "Export Selected Items"; the plugin will refuse anything other
-than exactly one item.
+Two things about that placement are worth knowing, because both look like bugs:
 
-It is also in File → Export, which is the same action.
+- **Nothing is exported.** Tropy has no segmentation hook and plugins cannot
+  contribute their own menu entries — they fill slots Tropy declares for the
+  import, export, extract and transcribe hooks — so `export` is the only one
+  that puts an item-scoped action in the context menu. `docs/tropy.md` records
+  what an upstream fix would need.
+- **A plugin with no instance is invisible.** The menu is built from
+  `config.json`, not from what is installed, which is why adding an instance is
+  a separate step from installing. The label is that instance's name, not the
+  plugin's `productName`.
 
-Nothing is exported. Tropy has no "segment" hook and plugins cannot contribute
-their own menu entries — they are confined to the import, export, extract and
-transcribe menus — so `export` is the only hook that puts an item-scoped action
-in the context menu. The wrong-sounding placement is a consequence of the plugin
-API, not a choice; `docs/tropy.md` records what an upstream fix would need.
-
-A confirmation dialog reports how many photos will be sent before anything is
-billed. Start with **Dry run** on.
+A confirmation dialog reports how many photos will be sent, and what it is
+estimated to cost, before anything is billed.
 
 ## Running in the renderer
 
@@ -283,6 +261,69 @@ src/constants.js  Tropy's action types and RDF properties, by hand
 the prompt, and are covered by `test/`,
 against a fake store that behaves the way Tropy's commands do — asynchronously,
 reporting results only through state. No model and no Tropy needed to run them.
+
+## Developing
+
+```bash
+npm install && npm run build
+```
+
+`npm run build` inlines `segmentation.md`, `metadata.md` and
+`segmentation.json` into the bundle, so **revising a policy means rebuilding
+the plugin**. That is the intended workflow: the policies are expected to change
+far more often than the code.
+
+### Packaging
+
+```bash
+npm run dist
+```
+
+That writes `dist/tropy-plugin-segmenter-<version>.zip`, the same artifact
+the release workflow publishes.
+
+The bundle is self-contained — no `require`, no `node_modules`, no `src` — so
+the zip carries only `index.js`, `package.json`, `icon.svg`, `LICENSE` and
+`third-party-licenses.txt`. Tropy never installs a plugin's dependencies, which
+is why `@anthropic-ai/sdk` is a *dev* dependency here: rollup inlines it.
+
+The zip must be named `<name>-<version>.zip` and hold one folder of the same
+name. Do not prefix the version with `v`: Tropy strips a trailing `-1.2.3` from
+the filename to name the installed folder, and that pattern only matches a dash
+followed by digits — `-v0.1.0` would survive into the folder name.
+
+During development you can skip the zip and copy `index.js`, `package.json` and
+`icon.svg` straight into the plugins folder.
+
+**Tropy must be fully quit and relaunched to pick up a new build.** Plugins are
+loaded with a plain `import(spec.main)` and the ES module cache is keyed by URL,
+so replacing `index.js` at the same path changes nothing until the process
+restarts — and reinstalling through the UI does not help, because the path is
+the same.
+
+Bump the version on every change — `npm run bump` — so the build that is
+actually loaded can be read off Preferences → Plugins, which shows
+`productName` and `version`.
+
+There is a catch that makes this worth stating precisely: the version comes
+from a **rescan** of `package.json`, while the code comes from the **module
+cache**. A plugins reload without an app restart rescans the spec but re-uses
+the cached module, so the panel would show the new version while the old code
+is still running. Always restart, and the two agree.
+
+### Releasing
+
+Tag and push; `.github/workflows/release.yml` builds, tests, packages and
+publishes a prerelease with the zip attached.
+
+```bash
+npm run bump          # or edit the version by hand
+git commit -am "..." && git push
+git tag v0.2.1 && git push origin v0.2.1
+```
+
+The workflow refuses to run if the tag and `package.json` disagree, so a
+release can never be named one thing and contain another.
 
 ## License
 

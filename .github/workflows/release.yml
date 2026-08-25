@@ -1,0 +1,54 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+      # The tag and package.json must agree, or the release is named one thing
+      # and contains another.
+      - name: Check the tag matches package.json
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package.json $VERSION" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_ENV"
+
+      # The zip is named from package.json, never from the tag: Tropy strips a
+      # trailing `-1.2.3` to name the installed folder, and that pattern needs
+      # a digit after the dash, so a `v` would survive into the folder name.
+      - run: npm run dist
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/tropy-plugin-segmenter-${{ env.version }}.zip
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            Install in Tropy: **Preferences → Plugins → Install Plugin**, and
+            choose the `.zip` below. Then add an instance with the `+` button,
+            give it a name, and paste an Anthropic API key into its settings.
+
+            See the [README](https://github.com/stakats/tropy-plugin-segmenter#readme)
+            for what it does and what it costs. Start with **Dry run** on.
