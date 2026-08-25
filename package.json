@@ -1,0 +1,127 @@
+{
+  "name": "tropy-plugin-segmenter",
+  "productName": "Segmenter",
+  "version": "0.2.0",
+  "description": "Group a batch-scanned item's photos into document-level items",
+  "author": {
+    "name": "Corporation for Digital Scholarship",
+    "url": "http://digitalscholar.org"
+  },
+  "icon": "icon.svg",
+  "main": "index.js",
+  "scripts": {
+    "build": "rollup -c rollup.config.mjs",
+    "watch": "rollup -c rollup.config.mjs --watch",
+    "lint": "eslint --color src test",
+    "pretest": "npm run build",
+    "test": "npm run lint && mocha test",
+    "dist": "npm run build && bash scripts/dist.sh",
+    "bump": "npm version patch --no-git-tag-version"
+  },
+  "keywords": [
+    "tropy",
+    "plugin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stakats/tropy-plugin-segmenter.git"
+  },
+  "license": "AGPL-3.0-or-later",
+  "hooks": {
+    "export": true
+  },
+  "options": [
+    {
+      "field": "apiKey",
+      "label": "Anthropic API key",
+      "type": "password",
+      "required": true,
+      "hint": "Stored as plain text in the plugins config.json."
+    },
+    {
+      "field": "model",
+      "label": "Model",
+      "type": "string",
+      "required": true,
+      "default": "claude-opus-5"
+    },
+    {
+      "field": "effort",
+      "label": "Effort (low, medium, high, xhigh, max)",
+      "type": "string",
+      "required": false,
+      "default": "high"
+    },
+    {
+      "field": "inputRate",
+      "label": "Input $ per million tokens (0 = use built-in rates)",
+      "type": "number",
+      "required": false,
+      "default": 0,
+      "hint": "Set both rates to price a run against a different tariff."
+    },
+    {
+      "field": "outputRate",
+      "label": "Output $ per million tokens (0 = use built-in rates)",
+      "type": "number",
+      "required": false,
+      "default": 0
+    },
+    {
+      "field": "scanEdge",
+      "label": "Scan size (longest edge, px)",
+      "type": "number",
+      "required": false,
+      "default": 1024
+    },
+    {
+      "field": "window",
+      "label": "Photos per pass",
+      "type": "number",
+      "required": false,
+      "default": 25
+    },
+    {
+      "field": "overlap",
+      "label": "Photos shared between passes",
+      "type": "number",
+      "required": false,
+      "default": 3
+    },
+    {
+      "field": "collectionNotes",
+      "label": "Collection notes (Markdown file)",
+      "type": "file",
+      "required": false,
+      "hint": "What is true of this collection but not of archives generally \u2014 its calendar, its document types, how its covers and surrogates behave. Appended to the built-in policy at run time."
+    },
+    {
+      "field": "reviewTag",
+      "label": "Tag applied to every new item",
+      "type": "string",
+      "required": false,
+      "default": "for review"
+    },
+    {
+      "field": "dryRun",
+      "label": "Dry run (report the plan, change nothing)",
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  ],
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.71.0",
+    "@rollup/plugin-commonjs": "^28.0.0",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "eslint": "^9.0.0",
+    "mocha": "^11.0.0",
+    "rollup": "^4.0.0",
+    "rollup-plugin-license": "^3.5.0"
+  },
+  "bugs": {
+    "url": "https://github.com/stakats/tropy-plugin-segmenter/issues"
+  },
+  "homepage": "https://github.com/stakats/tropy-plugin-segmenter#readme"
+}
