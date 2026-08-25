@@ -29,7 +29,7 @@ export const addTag = (payload) =>
 
 // Mirrors `act.metadata.save` in src/actions/metadata.js: the Save command
 // destructures `{ ids, data }` and iterates ids, so a lone `id` has to be
-// normalised into an array here. Passing `{ id }` writes nothing, silently.
+// normalized into an array here. Passing `{ id }` writes nothing, silently.
 export const saveMetadata = ({ id, ids, data }) =>
   ({
     type: METADATA.SAVE,

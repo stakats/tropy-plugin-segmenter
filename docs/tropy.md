@@ -116,7 +116,7 @@ write throws. Verify after everything settles, and read Tropy's log.
 A plugin is bundled separately and cannot import Tropy's action creators, so
 actions are constructed literally — and the creators do more than they look.
 
-- **`metadata.save` takes `payload.ids`, an array.** The creator normalises
+- **`metadata.save` takes `payload.ids`, an array.** The creator normalizes
   `{id}` → `{ids: [id]}` (`src/actions/metadata.js:87`); the command
   destructures `{ ids, data }`. Passing `{id}` writes nothing, silently.
 - **Every metadata value needs a datatype.** `metadata_values.datatype` is

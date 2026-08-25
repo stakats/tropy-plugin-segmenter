@@ -22,7 +22,7 @@ ${RECORDING}
 # This run
 
 You are applying the policies above to a sequence of photos belonging to a
-single batch-scanned item, in order. Each photo is labelled with its page
+single batch-scanned item, in order. Each photo is labeled with its page
 number.
 
 Report the documents you find. Page numbers are the labels given to you, and
@@ -32,7 +32,7 @@ Record a confidence for each document. Use "low" whenever the boundary, the
 date or the correspondent is uncertain — a later pass looks only at what you
 flag, so an honest "low" costs little and a false "high" is not caught.
 
-Leave covers, labels, rulers, colour targets and folder shots unassigned.
+Leave covers, labels, rulers, color targets and folder shots unassigned.
 
 ## Language
 

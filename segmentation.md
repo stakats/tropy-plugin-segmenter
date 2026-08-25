@@ -26,7 +26,7 @@ agree, call a boundary**.
 - A heading, title block, letterhead, masthead or printed form header
 - A salutation, address block or dateline set apart above the main text
 - Text starting unusually low, leaving a deep top margin
-- A centred title, a decorated or enlarged initial, a docket title
+- A centered title, a decorated or enlarged initial, a docket title
 
 **2. Did the previous page close something?**
 
@@ -38,7 +38,7 @@ agree, call a boundary**.
 
 **3. Is the material different?**
 
-- Change of hand, ink colour or writing implement (manuscript)
+- Change of hand, ink color or writing implement (manuscript)
 - Change of typeface, type size, column count or press quality (print)
 - Change of paper: size, tone, edge, texture, ruling, watermark
 - Change in the photograph itself — background, lighting, camera distance,
@@ -67,10 +67,10 @@ consistently. Getting it wrong doubles or halves every document in the dossier.
 
 - A **blank or near-blank page belongs to the document before it**, not the one
   after.
-- **Covers, labels, rulers, colour targets and folder shots are not documents.**
+- **Covers, labels, rulers, color targets and folder shots are not documents.**
   Leave them unassigned — they stay on the dossier shell.
 - **Enclosures** — an attachment travelling with a covering document — are a
-  judgement call: keep them with the parent when the parent refers to them and
+  judgment call: keep them with the parent when the parent refers to them and
   they carry no independent identity; make them their own item when they are
   substantial and separately titled.
 - **When the evidence is ambiguous, join rather than split**, and say so in the

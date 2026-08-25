@@ -34,7 +34,7 @@ the document types the open project already uses.
 
 Photos are reassigned, never duplicated. The batch item survives as an empty
 dossier shell holding the dossier-level record, and every step registers in
-Tropy's undo history. Covers, labels and colour targets stay on the shell.
+Tropy's undo history. Covers, labels and color targets stay on the shell.
 
 ## Building
 
@@ -284,11 +284,11 @@ the prompt, and are covered by `test/`,
 against a fake store that behaves the way Tropy's commands do — asynchronously,
 reporting results only through state. No model and no Tropy needed to run them.
 
-## Licence
+## License
 
-AGPL-3.0-or-later, the same licence as Tropy itself. `LICENSE` is the
+AGPL-3.0-or-later, the same license as Tropy itself. `LICENSE` is the
 unmodified AGPL text and `COPYRIGHT` carries the notice — kept apart so that
-GitHub and packaging tools can identify the licence automatically.
+GitHub and packaging tools can identify the license automatically.
 
 Copyright (c) 2026 Corporation for Digital Scholarship, Vienna, Virginia, USA. Note this differs from the repository root, which is MIT: none
 of that code is reused here.
@@ -297,5 +297,5 @@ The SPDX identifier is `AGPL-3.0-or-later` rather than the `AGPL-3.0` the older
 Tropy plugins declare — the latter is deprecated, and Tropy's own `package.json`
 uses `-or-later`.
 
-Licences of everything rollup inlines are collected into
+Licenses of everything rollup inlines are collected into
 `third-party-licenses.txt` at build time, and ship in the zip.

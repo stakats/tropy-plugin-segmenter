@@ -1,4 +1,4 @@
-// The manifest is the interface between the judgement and the mechanics: the
+// The manifest is the interface between the judgment and the mechanics: the
 // model produces it, and everything below this line is ordinary data handling
 // that can be read, tested and corrected without a model in the loop.
 
