@@ -21,7 +21,7 @@ rm -rf dist
 mkdir -p "$STAGE"
 
 # The bundle is self-contained: no requires, no node_modules, no src.
-cp index.js package.json icon.svg third-party-licenses.txt LICENSE "$STAGE/"
+cp index.js package.json icon.svg third-party-licenses.txt LICENSE COPYRIGHT "$STAGE/"
 
 (cd dist && zip -qr "$NAME-$VERSION.zip" "$NAME-$VERSION")
 

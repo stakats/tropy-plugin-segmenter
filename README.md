@@ -286,8 +286,11 @@ reporting results only through state. No model and no Tropy needed to run them.
 
 ## Licence
 
-AGPL-3.0-or-later, the same licence as Tropy itself, and `LICENSE` here is the
-full AGPL text. Note this differs from the repository root, which is MIT: none
+AGPL-3.0-or-later, the same licence as Tropy itself. `LICENSE` is the
+unmodified AGPL text and `COPYRIGHT` carries the notice — kept apart so that
+GitHub and packaging tools can identify the licence automatically.
+
+Copyright (c) 2026 Corporation for Digital Scholarship, Vienna, Virginia, USA. Note this differs from the repository root, which is MIT: none
 of that code is reused here.
 
 The SPDX identifier is `AGPL-3.0-or-later` rather than the `AGPL-3.0` the older
