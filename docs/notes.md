@@ -31,13 +31,6 @@ fix; a false boundary yields two half-documents carrying confident wrong
 metadata, which reads as complete. Evaluate on **false-boundary rate**, not
 overall accuracy.
 
-**Joining is the other half.** A group of individually imported scans is the
-same problem read backwards: which of these belong together as one document.
-Explode-then-merge already handles the general case, and the manifest already
-describes documents as runs of photos rather than as cuts, so the missing piece
-is a selection of many items rather than one, and a manifest whose page numbers
-span them.
-
 **A Gregorian date could be derived** for sorting, as long as it lives in its
 own field and is marked as derived — never overwriting the transcription.
 

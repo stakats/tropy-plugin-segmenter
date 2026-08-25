@@ -1,5 +1,5 @@
 import { DEFAULTS } from 'virtual:policy'
-import { getStore, getSelection } from './store.js'
+import { getStore, getPhotoSequence, getSelection } from './store.js'
 import { assertDistinct, planWindows, renderScans } from './scan.js'
 import { countInput, createClient, requestFor, segment } from './model.js'
 import { verify } from './verify.js'
@@ -49,22 +49,25 @@ export default class SegmenterPlugin {
 
       let selection = getSelection(state)
 
-      if (selection.length !== 1)
-        throw new Error(
-          `select exactly one batch-scanned item to segment (${
-            selection.length} selected)`)
+      if (selection.length === 0)
+        throw new Error('select the items to segment first')
 
-      let batchId = selection[0]
-      let item = state.items[batchId]
-      let photoIds = item?.photos ?? []
+      // One item holding a dossier, or a pile of separately imported scans —
+      // both are just a sequence of photos to read in order.
+      let photoIds = getPhotoSequence(state, selection)
 
       if (photoIds.length < 2)
-        throw new Error('this item has fewer than two photos, nothing to segment')
+        throw new Error(
+          'there are fewer than two photos in the selection, nothing to ' +
+          'segment')
 
       let photos = photoIds.map(id => state.photos[id])
 
       if (photos.some(p => p == null))
-        throw new Error('some of this item\'s photos are not loaded yet')
+        throw new Error('some of the selected photos are not loaded yet')
+
+      logger?.info(
+        `segmenting ${photoIds.length} photos across ${selection.length} item(s)`)
 
       // The key and the model are free-text fields, so they are checked
       // before anything is rendered and before the user is asked to commit.
@@ -108,7 +111,9 @@ export default class SegmenterPlugin {
         buttons: ['Cancel', 'Segment'],
         defaultId: 1,
         cancelId: 0,
-        message: 'Segment this item?',
+        message: (selection.length === 1) ?
+          'Segment this item?' :
+          `Segment these ${selection.length} items?`,
         detail: `${photoIds.length} photos go to ${model.display_name} to ` +
           `find document boundaries.\n\nEstimated cost: ${cost}\nBilled to ` +
           'your Anthropic API key.'
@@ -131,13 +136,14 @@ export default class SegmenterPlugin {
       }
 
       let result = await apply(store, {
-        batchId,
+        items: selection,
         documents,
         reviewTag: this.options.reviewTag,
         logger
       })
 
-      logger?.info(`split item ${batchId} into ${result.items.length} items`)
+      logger?.info(
+        `${selection.length} item(s) became ${result.items.length}`)
       await this.report(dialog, documents, manifest, {
         ...result, cost: describe({ ...usage, rate })
       })
@@ -254,7 +260,7 @@ export default class SegmenterPlugin {
       type: 'info',
       message: dryRun ?
         'Segmentation plan (nothing was changed)' :
-        `Split into ${items.length} items`,
+        `${items.length} documents`,
       detail
     })
   }

@@ -18,8 +18,27 @@ export function getStore(context) {
 // The selection Tropy would have exported. `getExportItems` reads the same
 // slice, but the export payload itself carries no ids, so the store is the
 // only way to learn which items are selected.
+//
+// Ordered as the list shows them, not as they were clicked: `nav.items` is
+// built by add/remove/replace as the user selects, so ctrl-clicking three
+// items bottom-up would otherwise make the last one page 1. `qr.items` is the
+// query result in the current sort order — what the user is actually looking
+// at. Anything not found there keeps its relative position at the end.
 export function getSelection(state) {
-  return (state.nav?.items?.length > 0) ? state.nav.items : (state.qr?.items ?? [])
+  let selected = (state.nav?.items?.length > 0) ?
+    state.nav.items :
+    (state.qr?.items ?? [])
+
+  let order = new Map((state.qr?.items ?? []).map((id, i) => [id, i]))
+
+  return [...selected].sort((a, b) =>
+    (order.get(a) ?? Infinity) - (order.get(b) ?? Infinity))
+}
+
+// Every photo of every selected item, in reading order: items as the list
+// shows them, photos as they sit within each item.
+export function getPhotoSequence(state, items) {
+  return items.flatMap(id => state.items[id]?.photos ?? [])
 }
 
 export function getPhotos(state, ids) {

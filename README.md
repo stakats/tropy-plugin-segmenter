@@ -1,7 +1,12 @@
 # Segmenter — a Tropy plugin
 
-Works out where the documents are in a batch-scanned item, and splits it into
-document-level items — in place, inside Tropy.
+Works out where the documents are in a pile of scans, and makes each one its
+own item — in place, inside Tropy.
+
+It reads a selection either way round. One item holding a whole dossier is
+split into its documents; a heap of separately imported photos is gathered into
+them. Both are the same question — *which of these pages belong together* —
+and a selection can mix the two.
 
 This is the self-contained shape described in [`docs/tropy.md`](docs/tropy.md):
 the plugin calls a model itself, so it needs no Claude Code and no operator.
@@ -46,8 +51,8 @@ Download the `.zip` from the [latest release][releases], then in Tropy:
 3. Open its **Settings** and paste an [Anthropic API key][key]. Nothing else is
    required — the rest of the options have working defaults.
 
-Then select a batch-scanned item and **right-click → Export Item →** your
-instance name. Nothing is exported: Tropy has no segmentation hook, and plugins
+Then select the items to segment — one holding many photos, or many holding one
+each — and **right-click → Export Item →** your instance name. Nothing is exported: Tropy has no segmentation hook, and plugins
 can only appear in the import, export, extract and transcribe menus, so the
 export menu is the only place an item-scoped action can live.
 
@@ -102,10 +107,13 @@ answered with the ids that would have worked.
 
 ## Using it
 
-Select one batch-scanned item and **right-click → Export Item →** your instance
-name, at the bottom of the submenu after a separator. A multi-selection puts it
-under "Export Selected Items"; the plugin refuses anything other than exactly
-one item. File → Export is the same action.
+Select what you want segmented and **right-click → Export Item →** your
+instance name, at the bottom of the submenu after a separator. A multi-selection
+puts it under "Export Selected Items" instead. File → Export is the same action.
+
+Photos are read in the order the item list shows them, and within each item in
+photo order — so sort the list the way the documents run before you start. The
+order you happened to click in makes no difference.
 
 Two things about that placement are worth knowing, because both look like bugs:
 
@@ -217,16 +225,6 @@ own date it is an inference wearing the clothes of a transcription — and the
 evidence for checking it has been discarded. If a sortable Gregorian date is
 wanted later, it belongs in its own field, marked as derived.
 
-## Where this is going
-
-Today the plugin runs one direction: one item holding many documents, split
-into many items. The judgment it makes — which of these pages belong together
-as one document — is the same in the other direction, where a group of
-separately imported scans should be *joined* into the documents they came from.
-That is why it is called a segmenter rather than a splitter; the mechanics
-(`src/manifest.js`, `src/apply.js`) already reason in terms of documents and
-their photos rather than in terms of splitting.
-
 ## Known limitations
 
 - **It cannot await a command.** Tropy's `rsvp` — the mechanism its REST API
@@ -319,7 +317,7 @@ publishes a prerelease with the zip attached.
 ```bash
 npm run bump          # or edit the version by hand
 git commit -am "..." && git push
-git tag v0.2.1 && git push origin v0.2.1
+git tag -a v0.2.1 -m "..." && git push origin v0.2.1
 ```
 
 The workflow refuses to run if the tag and `package.json` disagree, so a

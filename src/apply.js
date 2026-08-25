@@ -25,13 +25,19 @@ function metadataFor(doc) {
   return data
 }
 
-// Explode every assigned photo out of the batch item, then merge each
-// document's photos back together. Photos are reassigned, never duplicated,
-// and the batch item survives as an empty dossier shell holding the
-// dossier-level record. Both commands register their own undo entry.
+// Get every photo onto an item of its own, then merge each document's photos
+// back together.
+//
+// Both shapes of input reduce to the same thing. One item holding a dossier is
+// exploded first; a pile of separately imported scans is *already* in the
+// exploded state, one photo per item, and needs no exploding at all. What is
+// left in either case is a merge per document.
+//
+// Photos are reassigned, never duplicated, and any item that is split survives
+// as a shell holding whatever it recorded. Both commands register undo.
 export async function apply(store, options) {
   let {
-    batchId, documents, reviewTag, logger, onProgress, timeout = 15000
+    items: sources, documents, reviewTag, logger, onProgress, timeout = 15000
   } = options
 
   let assigned = documents.flatMap(doc => doc.photos)
@@ -40,21 +46,38 @@ export async function apply(store, options) {
     throw new Error('the manifest assigns no photos to any document')
 
   let state = store.getState()
+  let owners = new Set(sources)
 
   for (let id of assigned) {
-    if (state.photos[id]?.item !== batchId)
-      throw new Error(`photo ${id} does not belong to item ${batchId}`)
+    let owner = state.photos[id]?.item
+
+    if (!owners.has(owner))
+      throw new Error(
+        `photo ${id} belongs to item ${owner}, which is not in the selection`)
   }
 
-  logger?.info(
-    `exploding ${assigned.length} photos out of item ${batchId}`)
+  // A photo already alone on its item needs no exploding — that is the whole
+  // difference between the two shapes of input.
+  let toExplode = sources
+    .map(id => [id, state.items[id].photos.filter(p => assigned.includes(p))])
+    .filter(([id, photos]) =>
+      photos.length > 0 && state.items[id].photos.length > 1)
 
-  await dispatchAndWait(
-    store,
-    explode({ id: batchId, photos: assigned }),
-    (s) => assigned.every(id =>
-      s.photos[id]?.item != null && s.photos[id].item !== batchId),
-    { label: 'explode' })
+  if (toExplode.length > 0)
+    logger?.info(
+      `exploding ${toExplode.reduce((n, [, p]) => n + p.length, 0)} photos ` +
+      `out of ${toExplode.length} item(s)`)
+  else
+    logger?.info(`${assigned.length} photos are already one to an item`)
+
+  for (let [id, photos] of toExplode) {
+    await dispatchAndWait(
+      store,
+      explode({ id, photos }),
+      (s) => photos.every(p =>
+        s.photos[p]?.item != null && s.photos[p].item !== id),
+      { label: `explode item ${id}` })
+  }
 
   state = store.getState()
 
@@ -80,7 +103,7 @@ export async function apply(store, options) {
     onProgress?.(i + 1, documents.length)
   }
 
-  logger?.info(`created ${created.length} document-level items`)
+  logger?.info(`gathered ${created.length} document-level items`)
 
   // The photos are already where they belong, and that is the part that is
   // hard to redo by hand. Metadata and tags are worth reporting when they

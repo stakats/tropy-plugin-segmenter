@@ -2,6 +2,7 @@ import assert from 'node:assert'
 import { assertDistinct, planWindows } from '../src/scan.js'
 import { reconcile, resolve } from '../src/manifest.js'
 import { apply } from '../src/apply.js'
+import { getPhotoSequence, getSelection } from '../src/store.js'
 import { isUsable, verify } from '../src/verify.js'
 import { languageName } from '../src/locale.js'
 import { costOf, describe as describeCost, formatCost, rateFor } from '../src/cost.js'
@@ -211,7 +212,7 @@ describe('apply', () => {
     }, [11, 12, 13, 14])
 
     let { items: created, warnings } = await apply(store, {
-      batchId: 1, documents, reviewTag: 'for review'
+      items: [1], documents, reviewTag: 'for review'
     })
 
     assert.deepEqual(warnings, [])
@@ -251,7 +252,7 @@ describe('apply', () => {
       { documents: [{ first: 2, last: 3, title: 'Letter' }] },
       [11, 12, 13, 14])
 
-    await apply(store, { batchId: 1, documents, reviewTag: null })
+    await apply(store, { items: [1], documents, reviewTag: null })
 
     assert.deepEqual(store.getState().items[1].photos, [11, 14])
   })
@@ -261,11 +262,11 @@ describe('apply', () => {
 
     await assert.rejects(
       apply(store, {
-        batchId: 1,
+        items: [1],
         documents: [{ first: 1, last: 1, photos: [99] }],
         reviewTag: null
       }),
-      /does not belong to item 1/)
+      /not in the selection/)
   })
 })
 
@@ -376,7 +377,7 @@ describe('apply, when metadata cannot be written', () => {
     }, [11, 12, 13, 14])
 
     let { items, warnings } = await apply(store, {
-      batchId: 1, documents, reviewTag: 'for review', timeout: 200
+      items: [1], documents, reviewTag: 'for review', timeout: 200
     })
 
     assert.equal(items.length, 1)
@@ -423,7 +424,7 @@ describe('metadata datatypes', () => {
       }]
     }, [11, 12, 13, 14])
 
-    await apply(store, { batchId: 1, documents, reviewTag: null })
+    await apply(store, { items: [1], documents, reviewTag: null })
 
     let values = Object.values(seen.data)
     assert.ok(values.length >= 5)
@@ -559,5 +560,148 @@ describe('readCollectionNotes', () => {
 
     assert.equal(await readCollectionNotes(path, { logger, limit: 1000 }), '')
     assert.match(warned[0], /the limit is/)
+  })
+})
+
+// A pile of separately imported scans: one photo per item, which is the
+// already-exploded state.
+function looseScans(count) {
+  let next = 100
+  let listeners = []
+
+  let state = { items: {}, photos: {}, metadata: {}, tags: {} }
+
+  for (let i = 1; i <= count; ++i) {
+    state.items[i] = { id: i, photos: [10 + i], tags: [] }
+    state.photos[10 + i] = { id: 10 + i, item: i }
+  }
+
+  let notify = () => { for (let fn of [...listeners]) fn() }
+
+  return {
+    getState: () => state,
+    subscribe(fn) {
+      listeners.push(fn)
+      return () => { listeners = listeners.filter(x => x !== fn) }
+    },
+    dispatch(action) {
+      setTimeout(() => {
+        switch (action.type) {
+          case 'item.explode': {
+            for (let photo of action.payload.photos) {
+              let id = ++next
+              state.items[id] = { id, photos: [photo], tags: [] }
+              state.photos[photo] = { ...state.photos[photo], item: id }
+            }
+            let from = action.payload.id
+            state.items[from] = {
+              ...state.items[from],
+              photos: state.items[from].photos
+                .filter(p => !action.payload.photos.includes(p))
+            }
+            break
+          }
+          case 'item.merge': {
+            let [target, ...rest] = action.payload
+            let folded = rest.flatMap(id => state.items[id].photos)
+            state.items[target] = {
+              ...state.items[target],
+              photos: [...state.items[target].photos, ...folded]
+            }
+            for (let id of rest) delete state.items[id]
+            for (let p of folded)
+              state.photos[p] = { ...state.photos[p], item: target }
+            break
+          }
+          case 'metadata.save':
+            for (let id of action.payload.ids)
+              state.metadata[id] = { ...action.payload.data }
+            break
+          default:
+            throw new Error(`unexpected action ${action.type}`)
+        }
+        notify()
+      }, 0)
+    }
+  }
+}
+
+describe('apply, over a pile of separately imported scans', () => {
+  it('merges them into documents without exploding anything', async () => {
+    let store = looseScans(6)
+    let dispatched = []
+    let dispatch = store.dispatch
+    store.dispatch = (a) => { dispatched.push(a.type); return dispatch(a) }
+
+    let documents = resolve({
+      documents: [
+        { first: 1, last: 3, title: 'Letter', confidence: 'high' },
+        { first: 4, last: 6, title: 'Minute', confidence: 'high' }
+      ]
+    }, [11, 12, 13, 14, 15, 16])
+
+    let { items } = await apply(store, {
+      items: [1, 2, 3, 4, 5, 6], documents, reviewTag: null
+    })
+
+    // Nothing to explode: every photo was already alone on its item.
+    assert.ok(!dispatched.includes('item.explode'))
+
+    assert.equal(items.length, 2)
+    assert.deepEqual(store.getState().items[items[0]].photos, [11, 12, 13])
+    assert.deepEqual(store.getState().items[items[1]].photos, [14, 15, 16])
+  })
+
+  it('leaves a scan that belongs to no document alone', async () => {
+    let store = looseScans(4)
+
+    let documents = resolve(
+      { documents: [{ first: 2, last: 3, title: 'Letter' }] },
+      [11, 12, 13, 14])
+
+    await apply(store, { items: [1, 2, 3, 4], documents, reviewTag: null })
+
+    let state = store.getState()
+    assert.deepEqual(state.items[1].photos, [11])
+    assert.deepEqual(state.items[4].photos, [14])
+  })
+
+  it('refuses a photo whose item was not selected', async () => {
+    let store = looseScans(4)
+
+    await assert.rejects(
+      apply(store, {
+        items: [1, 2],
+        documents: [{ first: 1, last: 1, photos: [13] }],
+        reviewTag: null
+      }),
+      /not in the selection/)
+  })
+})
+
+describe('the selection', () => {
+  it('reads in list order, not in the order items were clicked', () => {
+    let state = {
+      nav: { items: [30, 10, 20] },
+      qr: { items: [10, 20, 30, 40] }
+    }
+    assert.deepEqual(getSelection(state), [10, 20, 30])
+  })
+
+  it('falls back to the whole list when nothing is selected', () => {
+    assert.deepEqual(
+      getSelection({ nav: { items: [] }, qr: { items: [7, 8] } }), [7, 8])
+  })
+
+  it('keeps items the list does not know about, at the end', () => {
+    let state = { nav: { items: [99, 20, 10] }, qr: { items: [10, 20] } }
+    assert.deepEqual(getSelection(state), [10, 20, 99])
+  })
+
+  it('reads photos item by item, in order', () => {
+    let state = {
+      items: { 1: { photos: [11, 12] }, 2: { photos: [21] }, 3: {} }
+    }
+    assert.deepEqual(getPhotoSequence(state, [1, 2, 3]), [11, 12, 21])
   })
 })
