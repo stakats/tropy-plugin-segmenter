@@ -1,0 +1,25 @@
+{
+  "_comment": "Model prices, kept out of the source because they change on Anthropic's schedule rather than this plugin's. Revise this file and rebuild; nothing in src/ needs touching. The two rate options in the plugin's preferences override everything here.",
+
+  "updated": "2026-08-25",
+  "_updated": "When these prices were last checked against Anthropic's pricing page. Shown to the user alongside any cost, so a figure from a stale table cannot pass for a current one.",
+
+  "source": "https://www.anthropic.com/pricing",
+
+  "currency": "USD",
+  "per": 1000000,
+  "_per": "Prices are per this many tokens.",
+
+  "rates": {
+    "claude-fable-5": { "input": 10, "output": 50 },
+    "claude-mythos-5": { "input": 10, "output": 50 },
+    "claude-opus-5": { "input": 5, "output": 25 },
+    "claude-opus-4-8": { "input": 5, "output": 25 },
+    "claude-opus-4-7": { "input": 5, "output": 25 },
+    "claude-opus-4-6": { "input": 5, "output": 25 },
+    "claude-sonnet-5": { "input": 3, "output": 15 },
+    "claude-sonnet-4-6": { "input": 3, "output": 15 },
+    "claude-haiku-4-5": { "input": 1, "output": 5 }
+  },
+  "_rates": "Matched by exact model id first, then by prefix, so a dated snapshot such as claude-haiku-4-5-20251001 resolves to its family. A model absent from this table reports its token counts and says nothing about money."
+}

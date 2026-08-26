@@ -1,4 +1,4 @@
-import { DEFAULTS, DIGESTS, VERSION } from 'virtual:policy'
+import { DEFAULTS, DIGESTS, PRICING, VERSION } from 'virtual:policy'
 import { getStore, getPhotoSequence, getSelection } from './store.js'
 import { assertDistinct, planWindows, renderScans } from './scan.js'
 import { countInput, createClient, requestFor, segment } from './model.js'
@@ -94,8 +94,11 @@ export default class SegmenterPlugin {
 
       let language = languageName(state.intl?.locale)
       let rate = rateFor(model.id, {
-        input: this.options.inputRate,
-        output: this.options.outputRate
+        rates: PRICING.rates,
+        overrides: {
+          input: this.options.inputRate,
+          output: this.options.outputRate
+        }
       })
 
       // Rendering is local and free, and it is what makes the estimate exact
@@ -120,7 +123,9 @@ export default class SegmenterPlugin {
 
       let cost = (input == null) ?
         'not known until it runs' :
-        describe({ input, output, rate, estimated: true })
+        describe({
+          input, output, rate, estimated: true, pricedOn: PRICING.updated
+        })
 
       let go = await dialog.show('message-box', {
         type: 'question',
@@ -139,7 +144,7 @@ export default class SegmenterPlugin {
 
       let { manifest, usage } = await this.run(requests, client, logger)
 
-      logger?.info(`actual cost ${describe({ ...usage, rate })}`)
+      logger?.info(`actual cost ${describe({ ...usage, rate, pricedOn: PRICING.updated })}`)
 
       let documents = resolve(manifest, photoIds)
 
@@ -163,7 +168,7 @@ export default class SegmenterPlugin {
       logger?.info(
         `${selection.length} item(s) became ${result.items.length}`)
       await this.report(dialog, documents, manifest, {
-        ...result, cost: describe({ ...usage, rate })
+        ...result, cost: describe({ ...usage, rate, pricedOn: PRICING.updated })
       })
 
     } catch (err) {

@@ -1,36 +1,27 @@
 // Turning token counts into money.
 //
-// Pricing is not exposed by the API — there is no endpoint to ask — so this
-// table is maintained by hand and will go stale. Everything here is written so
-// that a stale or missing rate degrades to "report the tokens and say nothing
-// about cost", never to a confident wrong number.
+// The prices themselves are not here: they live in `pricing.json`, because
+// they change on Anthropic's schedule rather than this plugin's, and there is
+// no endpoint to ask — no part of the API reports what a model costs. This
+// file is only the arithmetic, and it is written so that a stale or missing
+// rate degrades to "report the tokens and say nothing about money", never to a
+// confident wrong number.
 
-// US dollars per million tokens, from Anthropic's pricing page, 2026-08-25.
-// Keys are matched by exact model id first, then by prefix, so dated snapshots
-// (claude-haiku-4-5-20251001) resolve to their family.
-const RATES = {
-  'claude-fable-5': { input: 10, output: 50 },
-  'claude-mythos-5': { input: 10, output: 50 },
-  'claude-opus-5': { input: 5, output: 25 },
-  'claude-opus-4-8': { input: 5, output: 25 },
-  'claude-opus-4-7': { input: 5, output: 25 },
-  'claude-opus-4-6': { input: 5, output: 25 },
-  'claude-sonnet-5': { input: 3, output: 15 },
-  'claude-sonnet-4-6': { input: 3, output: 15 },
-  'claude-haiku-4-5': { input: 1, output: 5 }
-}
+// The table is passed in rather than imported, so that this file has no
+// opinion about what anything costs and can be tested without a build.
 
-export function rateFor(model, overrides = {}) {
-  // An explicit override wins: rates differ on partner platforms, and this is
-  // the escape hatch when the table above is out of date.
+export function rateFor(model, { rates = {}, overrides = {} } = {}) {
+  // An explicit override wins: rates differ on partner platforms and under
+  // enterprise agreements, and it is the escape hatch when `pricing.json` has
+  // gone stale in an installed copy that cannot be rebuilt.
   if (overrides.input > 0 && overrides.output > 0)
     return { input: overrides.input, output: overrides.output }
 
-  if (RATES[model]) return RATES[model]
+  if (rates[model]) return rates[model]
 
-  let prefix = Object.keys(RATES).find(id => model?.startsWith(id))
+  let prefix = Object.keys(rates).find(id => model?.startsWith(id))
 
-  return prefix ? RATES[prefix] : null
+  return prefix ? rates[prefix] : null
 }
 
 export function costOf({ input = 0, output = 0 }, rate) {
@@ -55,7 +46,7 @@ export function formatTokens(n) {
 // What a run cost, or — before it runs — what it is likely to cost. `output`
 // is the only guess: thinking tokens are billed as output and vary with
 // effort, so the caller supplies an allowance per page.
-export function describe({ input, output, rate, estimated = false }) {
+export function describe({ input, output, rate, estimated = false, pricedOn }) {
   let usd = formatCost(costOf({ input, output }, rate))
 
   let tokens = estimated ?
@@ -66,5 +57,7 @@ export function describe({ input, output, rate, estimated = false }) {
     return `${tokens} — no published rate for this model, so see your ` +
       'Anthropic usage page'
 
-  return `${usd} (${tokens})`
+  // Saying when the prices were checked is the difference between a figure and
+  // a figure you can decide whether to trust.
+  return `${usd} (${tokens}${pricedOn ? `, at ${pricedOn} prices` : ''})`
 }

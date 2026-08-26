@@ -9,7 +9,7 @@ import { costOf, describe as describeCost, formatCost, rateFor } from '../src/co
 import { typeVocabulary } from '../src/vocabulary.js'
 import { readCollectionNotes } from '../src/collection.js'
 import { MARKER, provenanceNote } from '../src/provenance.js'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -498,21 +498,33 @@ describe('metadata datatypes', () => {
 })
 
 describe('cost', () => {
+  // The table is the caller's business, so the arithmetic is tested against a
+  // fixture and the shipped prices are checked separately, below.
+  const rates = {
+    'claude-opus-5': { input: 5, output: 25 },
+    'claude-haiku-4-5': { input: 1, output: 5 }
+  }
+
   it('prices a model, including dated snapshots', () => {
-    assert.deepEqual(rateFor('claude-opus-5'), { input: 5, output: 25 })
-    assert.deepEqual(rateFor('claude-haiku-4-5-20251001'), { input: 1, output: 5 })
+    assert.deepEqual(
+      rateFor('claude-opus-5', { rates }), { input: 5, output: 25 })
+    assert.deepEqual(
+      rateFor('claude-haiku-4-5-20251001', { rates }), { input: 1, output: 5 })
   })
 
-  it('lets an explicit tariff override the built-in table', () => {
+  it('lets an explicit tariff override the table', () => {
     assert.deepEqual(
-      rateFor('claude-opus-5', { input: 2, output: 10 }), { input: 2, output: 10 })
+      rateFor('claude-opus-5', { rates, overrides: { input: 2, output: 10 } }),
+      { input: 2, output: 10 })
     // A half-set override is ignored rather than half-applied.
     assert.deepEqual(
-      rateFor('claude-opus-5', { input: 2, output: 0 }), { input: 5, output: 25 })
+      rateFor('claude-opus-5', { rates, overrides: { input: 2, output: 0 } }),
+      { input: 5, output: 25 })
   })
 
   it('says nothing rather than guessing for an unknown model', () => {
-    assert.equal(rateFor('claude-something-9'), null)
+    assert.equal(rateFor('claude-something-9', { rates }), null)
+    assert.equal(rateFor('claude-opus-5'), null, 'and with no table at all')
     assert.equal(costOf({ input: 1e6, output: 1e6 }, null), null)
     assert.match(
       describeCost({ input: 100, output: 10, rate: null }), /no published rate/)
@@ -520,7 +532,7 @@ describe('cost', () => {
 
   it('prices a real run', () => {
     // The Ribet dossier: 24 pages, one pass.
-    let usd = costOf({ input: 29264, output: 3188 }, rateFor('claude-opus-5'))
+    let usd = costOf({ input: 29264, output: 3188 }, rateFor('claude-opus-5', { rates }))
     assert.ok(Math.abs(usd - 0.2260) < 0.0005, `got ${usd}`)
   })
 
@@ -529,6 +541,21 @@ describe('cost', () => {
     assert.equal(formatCost(12.5), '$12.50')
     assert.equal(formatCost(0.004), '<$0.01')
     assert.equal(formatCost(0.006), '$0.01')
+  })
+
+  it('says when the prices were checked, so a stale figure shows itself', () => {
+    let described = describeCost({
+      input: 29264, output: 3188, rate: rates['claude-opus-5'],
+      pricedOn: '2026-08-25'
+    })
+    assert.match(described, /\$0\.23/)
+    assert.match(described, /at 2026-08-25 prices/)
+  })
+
+  it('omits the date rather than implying prices were never checked', () => {
+    assert.ok(!describeCost({
+      input: 100, output: 10, rate: rates['claude-opus-5']
+    }).includes('prices'))
   })
 })
 
@@ -933,5 +960,36 @@ describe('notes on the items apply creates', () => {
 
     let { notes } = await apply(store, { items: [1], documents, reviewTag: null })
     assert.equal(notes, 0)
+  })
+})
+
+describe('pricing.json', () => {
+  // The prices live in a file rather than in source, so this is what guards
+  // them: the shape the build depends on, and a sanity check on the values.
+  let pricing
+
+  before(async () => {
+    pricing = JSON.parse(
+      await readFile(new URL('../pricing.json', import.meta.url), 'utf-8'))
+  })
+
+  it('says when it was last checked', () => {
+    assert.match(pricing.updated, /^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('is priced per million tokens, in dollars', () => {
+    assert.equal(pricing.per, 1000000)
+    assert.equal(pricing.currency, 'USD')
+  })
+
+  it('prices the default model', () => {
+    assert.deepEqual(pricing.rates['claude-opus-5'], { input: 5, output: 25 })
+  })
+
+  it('gives every model both rates, output dearer than input', () => {
+    for (let [model, rate] of Object.entries(pricing.rates)) {
+      assert.ok(rate.input > 0, `${model} input`)
+      assert.ok(rate.output > rate.input, `${model} output`)
+    }
   })
 })

@@ -17,6 +17,7 @@ const root = here
 //
 //   segmentation.md  where one document ends and the next begins
 //   metadata.md      what is recorded about each one
+//   pricing.json     what a run costs, on Anthropic's schedule not ours
 //
 // Neither is code. Anything true only of one collection belongs in these
 // files, not in `src/`.
@@ -34,6 +35,8 @@ function policy() {
       const recording = readFileSync(resolvePath(root, 'metadata.md'), 'utf-8')
       const settings = JSON.parse(
         readFileSync(resolvePath(root, 'segmentation.json'), 'utf-8'))
+      const pricing = JSON.parse(
+        readFileSync(resolvePath(root, 'pricing.json'), 'utf-8'))
 
       // Keys prefixed with _ are documentation for the humans editing the file.
       const defaults = Object.fromEntries(
@@ -43,6 +46,7 @@ function policy() {
       this.addWatchFile(resolvePath(root, 'segmentation.md'))
       this.addWatchFile(resolvePath(root, 'metadata.md'))
       this.addWatchFile(resolvePath(root, 'segmentation.json'))
+      this.addWatchFile(resolvePath(root, 'pricing.json'))
 
       // A short digest of each policy, so an item's note can say which rules
       // it was segmented under. The policies are the prompt: without this,
@@ -55,6 +59,9 @@ function policy() {
         `export const RECORDING = ${JSON.stringify(recording)}`,
         `export const DEFAULTS = ${JSON.stringify(defaults)}`,
         `export const VERSION = ${JSON.stringify(pkg.version)}`,
+        `export const PRICING = ${JSON.stringify(
+          Object.fromEntries(Object.entries(pricing)
+            .filter(([k]) => !k.startsWith('_'))))}`,
         `export const DIGESTS = ${JSON.stringify({
           segmentation: digest(md),
           metadata: digest(recording)

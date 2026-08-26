@@ -267,10 +267,18 @@ the real figure.
 Costs are shown to the cent. For reference, a 24-page dossier through Claude
 Opus 5 at high effort cost **$0.23** — 29.3k tokens in, 3.2k out.
 
-Rates are not available from the API — there is no endpoint to ask — so
-`src/cost.js` carries a table that will go stale. It is written so that an
-unknown model reports tokens and says nothing about money, rather than
-printing a confident wrong number. The two rate options override the table.
+Rates are not available from the API — no endpoint reports what a model costs —
+so they are kept by hand in [`pricing.json`](pricing.json), beside the policies
+rather than inside `src/`. They change on Anthropic's schedule, not this
+plugin's, and keeping them in a data file means revising one number and
+rebuilding, with nothing in the source to touch.
+
+Every figure is shown with the date the prices were last checked — *"$0.23
+(29.3k in, 3.2k out, at 2026-08-25 prices)"* — because a cost from a stale
+table should not be able to pass for a current one. A model absent from the
+table reports its tokens and says nothing about money, rather than printing a
+confident wrong number. The two rate options override everything, for partner
+tariffs, enterprise agreements, or an installed copy that cannot be rebuilt.
 
 ## Dates
 
@@ -334,8 +342,8 @@ reporting results only through state. No model and no Tropy needed to run them.
 npm install && npm run build
 ```
 
-`npm run build` inlines `segmentation.md`, `metadata.md` and
-`segmentation.json` into the bundle, so **revising a policy means rebuilding
+`npm run build` inlines `segmentation.md`, `metadata.md`, `segmentation.json`
+and `pricing.json` into the bundle, so **revising a policy means rebuilding
 the plugin**. That is the intended workflow: the policies are expected to change
 far more often than the code.
 
