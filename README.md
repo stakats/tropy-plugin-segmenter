@@ -201,6 +201,30 @@ Notes are additive: they make the policy concrete, and where they are silent it
 still applies. They are also never load-bearing, so a missing, empty or
 oversized file is logged and the run continues on the built-in policy alone.
 
+## Selections that span several items
+
+A selection can be one batch-scanned item, a pile of separately imported scans,
+or a mix. The pages are read **in the order the list shows them**, item by item
+— which for loose scans means the order of whatever column the list is sorted
+by. The confirmation dialog says which, because that is the last point at which
+you can resort or reselect.
+
+Where pages were **gathered separately**, the join between them is marked for
+the model. The unit is not the item: in the commonest project every item holds
+one photo, so marking every item boundary would drown the sequence and make
+discontinuity the default in exactly the workflow most people use. A join is
+marked where pages belong to different items *and* either one of those items
+holds more than one photo — a grouping somebody made — or their files sit in
+different folders. Forty scans dragged in from one folder produce no joins at
+all; two dossiers produce one between them; twenty scans from one shoot
+followed by twenty from another produce one where the shoots meet.
+
+A join is not a boundary. It says only that the pages either side came together
+by different routes, so a document carried across one needs the positive
+evidence any boundary call needs. And a whole group may not belong with the
+rest — over-selecting a neighbouring item is easy — in which case its pages are
+left unassigned and stay exactly where they are.
+
 ## Provenance notes
 
 **Every item this plugin creates gets a note** recording that a model made the
@@ -218,6 +242,9 @@ judgement, and enough about the run to weigh it:
 > > images: 1024 px longest edge
 > > source: item 4759, pages 4-7
 > > confidence: medium
+> > selection: 44 single-photo items
+> > order: list order, sorted by Title
+> > assembled: pages from items 4760, 4761
 > > policy: segmentation.md 3f9a1c2b, metadata.md b7e04255
 > > collection notes: anom-serie-e.md 1d5c8890
 
@@ -235,6 +262,12 @@ migrated from. That shapes them:
 - **Honest about what was seen.** The scan size matters more than anything else
   here. A date misread from a 1024 px copy is a different kind of error from one
   misread at full resolution, and nothing else in Tropy records it.
+- **Clear about how the pages were ordered.** `order` and `selection` appear
+  only for a selection of several items, where the sequence came from the list
+  rather than from the item. `assembled` appears only where a document was
+  carried across a grouping somebody had already made — not for the ordinary
+  joining of loose scans, which is the point of such a run rather than
+  something to flag.
 - **Digested, not described.** The prompt *is* `segmentation.md`, `metadata.md`
   and your collection notes, so each is recorded with a short digest. Without
   them, "was this item segmented under the current rules?" has no answer.

@@ -31,6 +31,13 @@ fix; a false boundary yields two half-documents carrying confident wrong
 metadata, which reads as complete. Evaluate on **false-boundary rate**, not
 overall accuracy.
 
+**Adjacency across a join is only as good as the sort.** For a selection of
+loose scans the sequence is the list's order, and nothing verifies that the
+sort means anything. The dialog names the column so a person can judge it, and
+the note records it, but neither the plugin nor the model can tell a
+meaningful sort from a meaningless one. Sorting by Position or by filename
+usually means capture order; sorting by Creator does not.
+
 **A Gregorian date could be derived** for sorting, as long as it lives in its
 own field and is marked as derived — never overwriting the transcription.
 

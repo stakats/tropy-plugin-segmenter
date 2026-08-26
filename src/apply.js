@@ -160,9 +160,12 @@ export async function apply(store, options) {
 
   for (let i = 0; i < documents.length; ++i) {
     let doc = documents[i]
+    let sources = provenance ? provenance.sourcesOf(doc) : []
+
     let html = provenance && provenanceNote(doc, {
       ...provenance,
-      source: provenance.sourceOf(doc),
+      source: sources[0] ?? { id: '?' },
+      sources,
       pages: doc.first === doc.last ?
         `${doc.first}` : `${doc.first}-${doc.last}`
     })

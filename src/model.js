@@ -1,80 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { POLICY, RECORDING } from 'virtual:policy'
+import { seamLabel, seamsIn } from './seams.js'
 
-// The prompt is the two policy files, inlined from the repository root at
-// build time (see rollup.config.mjs). Nothing about a particular collection —
-// its calendar, its language, its document types — belongs in this file; it
-// belongs in `segmentation.md` or `metadata.md`, which can be revised, or
-// replaced for another archive, without touching any code.
-//
-// What is built here is only what cannot be written down in advance: the task
-// framing, and the two things known solely at run time — the interface
-// language, and the vocabulary this project already uses.
-function system(language, vocabulary = [], notes = '') {
-  return `${POLICY}
-
----
-
-${RECORDING}
-
----
-
-# This run
-
-You are applying the policies above to a sequence of photos belonging to a
-single batch-scanned item, in order. Each photo is labeled with its page
-number.
-
-Report the documents you find. Page numbers are the labels given to you, and
-every document is a contiguous run of pages.
-
-Record a confidence for each document. Use "low" whenever the boundary, the
-date or the correspondent is uncertain — a later pass looks only at what you
-flag, so an honest "low" costs little and a false "high" is not caught.
-
-Leave covers, labels, rulers, color targets and folder shots unassigned.
-
-## Language
-
-The catalogue record follows the language of each document, as the recording
-policy above describes.
-
-\`note\` is the exception, because it is addressed to the person working in
-Tropy rather than to the record. This person works in ${language}, so write
-\`note\` in ${language}.
-
-## The vocabulary of this project
-${vocabulary.length > 0 ? `
-These are the document types this project already uses, with how many items
-carry each:
-
-${vocabulary.map(({ term, count }) => `- ${term} — ${count}`).join('\n')}
-
-Prefer an existing term to a new one, and a widely used term to a rarely used
-one: the counts are the evidence of what this project's convention actually is,
-and a term used once may be a leftover rather than a practice. Copy the wording
-and capitalization exactly, so the field stays sortable.
-
-Coin a new term only when nothing above describes the document. A term you coin
-should be short and singular and match the language and style of the list, and
-should not carry a parenthetical gloss — anything that needs explaining belongs
-in \`note\`. Terms already in use are the project's business, whatever shape
-they are in.` : `
-This project has no document types recorded yet, so you are setting the
-convention. Keep the terms short, singular and consistent across the dossier,
-and in the language of the documents.`}
-${notes ? `
----
-
-# This collection
-
-What follows was written by the person running this, about the particular
-material you are looking at. It is additive: it makes the policies above
-concrete, and where it is silent they still apply. Where it describes this
-material more precisely than they do, follow it.
-
-${notes}` : ''}`
-}
+// Building and sending one request. The prompt itself is assembled in
+// `prompt.js`, which is where the policies are inlined; this file takes the
+// system text as a string so that it holds no policy of its own and can be
+// tested without a build.
 
 const SCHEMA = {
   type: 'object',
@@ -115,7 +45,10 @@ const SCHEMA = {
     unassigned: {
       type: 'array',
       items: { type: 'integer' },
-      description: 'pages that are not documents — covers, labels, targets'
+      description:
+        'pages to leave exactly where they are: covers, labels, rulers and ' +
+        'color targets, and pages from a group that has nothing to do with ' +
+        'the rest of the selection'
     },
     openAtEnd: {
       type: 'boolean',
@@ -153,13 +86,27 @@ export function createClient(apiKey) {
 // windows can be reconciled without renumbering.
 export function requestFor(scans, offset, options = {}) {
   let {
-    model = 'claude-opus-5', effort = 'high', language = 'English',
-    vocabulary = [], notes = ''
+    model = 'claude-opus-5', effort = 'high', system = '', titles, sizes
   } = options
 
   let content = []
+  let seams = seamsIn(scans, sizes)
+
+  if (seams.size > 0)
+    content.push({
+      type: 'text',
+      text: 'Some of these pages were gathered separately from the others. ' +
+        'Where that is so, the join is marked between the pages.'
+    })
 
   for (let i = 0; i < scans.length; ++i) {
+    // A marker sits between two pages and takes no page number of its own.
+    if (seams.has(i))
+      content.push({
+        type: 'text',
+        text: seamLabel(scans[i - 1], scans[i], { titles, sizes })
+      })
+
     content.push({ type: 'text', text: `Page ${offset + i + 1}` })
     content.push({
       type: 'image',
@@ -183,7 +130,7 @@ export function requestFor(scans, offset, options = {}) {
     // against this budget, so a tight ceiling truncates the manifest rather
     // than the reasoning. Streaming is what makes a budget this large safe.
     max_tokens: 64000,
-    system: system(language, vocabulary, notes),
+    system,
     messages: [{ role: 'user', content }],
     output_config: {
       effort,

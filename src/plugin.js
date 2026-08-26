@@ -2,12 +2,14 @@ import { DEFAULTS, DIGESTS, PRICING, VERSION } from 'virtual:policy'
 import { getStore, getPhotoSequence, getSelection } from './store.js'
 import { assertDistinct, planWindows, renderScans } from './scan.js'
 import { countInput, createClient, requestFor, segment } from './model.js'
+import { system } from './prompt.js'
 import { verify } from './verify.js'
 import { languageName } from './locale.js'
 import { describe, rateFor } from './cost.js'
 import { typeVocabulary } from './vocabulary.js'
 import { readCollectionNotes } from './collection.js'
 import { MARKER } from './provenance.js'
+import { folders, sortColumn } from './order.js'
 import { reconcile, resolve } from './manifest.js'
 import { apply } from './apply.js'
 
@@ -103,6 +105,21 @@ export default class SegmenterPlugin {
 
       // Rendering is local and free, and it is what makes the estimate exact
       // rather than a guess, so it happens before the user is asked to commit.
+      let titles = new Map(selection.map(id => [
+        id,
+        state.metadata[id]?.['http://purl.org/dc/elements/1.1/title']?.text
+      ]))
+      let sizes = new Map(selection.map(id => [
+        id, state.items[id]?.photos?.length ?? 0
+      ]))
+
+      let shape = {
+        titles,
+        sizes,
+        order: sortColumn(state),
+        folders: folders(photos)
+      }
+
       let vocabulary = typeVocabulary(state)
 
       if (vocabulary.length > 0)
@@ -112,8 +129,10 @@ export default class SegmenterPlugin {
       let collection = await readCollectionNotes(
         this.options.collectionNotes, { logger })
 
-      let requests = await this.prepare(
-        photos, { logger, sharp, language, vocabulary, notes: collection.text })
+      let requests = await this.prepare(photos, {
+        logger, sharp, language, vocabulary, notes: collection.text,
+        titles, sizes
+      })
       let input = await this.price(client, requests, logger)
 
       // Thinking is billed as output and scales with effort, so this is the
@@ -135,9 +154,12 @@ export default class SegmenterPlugin {
         message: (selection.length === 1) ?
           'Segment this item?' :
           `Segment these ${selection.length} items?`,
-        detail: `${photoIds.length} photos go to ${model.display_name} to ` +
-          `find document boundaries.\n\nEstimated cost: ${cost}\nBilled to ` +
-          'your Anthropic API key.'
+        detail: [
+          this.describeSelection(selection, photoIds, shape, model),
+          '',
+          `Estimated cost: ${cost}`,
+          'Billed to your Anthropic API key.'
+        ].join('\n')
       })
 
       if (go.response !== 1) return
@@ -161,7 +183,8 @@ export default class SegmenterPlugin {
         documents,
         reviewTag: this.options.reviewTag,
         lowConfidenceTag: this.options.lowConfidenceTag,
-        provenance: this.provenance(state, selection, model, collection),
+        provenance: this.provenance(
+          state, selection, model, collection, shape),
         logger
       })
 
@@ -181,14 +204,46 @@ export default class SegmenterPlugin {
     }
   }
 
+  // What is about to happen, in enough detail to decide against it. This is
+  // the last point at which the selection or the sort can be changed, and the
+  // order the pages will be read in is not otherwise visible anywhere.
+  describeSelection(selection, photoIds, shape, model) {
+    let single = selection.length === 1
+    let allSingle = [...shape.sizes.values()].every(n => n === 1)
+
+    let what = single ?
+      `${photoIds.length} photos` :
+      allSingle ?
+        `${photoIds.length} scans, one photo each` :
+        `${photoIds.length} photos from ${selection.length} items`
+
+    let order = single ?
+      'in the order they sit in the item' :
+      shape.order ?
+        `in the order the list shows them, sorted by ${shape.order}` :
+        'in the order the list shows them'
+
+    return [
+      `${what} go to ${model.display_name} to find document boundaries, ` +
+      `${order}.`,
+      // Only worth saying when it can distinguish anything: a managed project
+      // keeps every photo in one store, so this stays silent there.
+      shape.folders.length > 1 ?
+        `They are drawn from ${shape.folders.length} different folders.` :
+        null
+    ].filter(Boolean).join('\n')
+  }
+
   // Everything an item's note has to say about how it came to exist. Gathered
   // once per run so that every item records the same run, and so that what is
   // being written down is legible in one place.
-  provenance(state, selection, model, collection) {
-    let titles = Object.fromEntries(selection.map(id => [
-      id,
-      state.metadata[id]?.['http://purl.org/dc/elements/1.1/title']?.text
-    ]))
+  provenance(state, selection, model, collection, shape) {
+    let allSingle = [...shape.sizes.values()].every(n => n === 1)
+    let photoItem = new Map()
+
+    for (let id of selection) {
+      for (let photo of state.items[id]?.photos ?? []) photoItem.set(photo, id)
+    }
 
     return {
       marker: MARKER,
@@ -200,16 +255,33 @@ export default class SegmenterPlugin {
       collection: collection.source,
       runId: runId(),
       at: timestamp(),
-      // Which source item a document came from, for a selection spanning many.
-      sourceOf: (doc) => {
-        let id = doc.source ?? selection[0]
-        return { id, title: titles[id] }
-      }
+
+      selection: (selection.length === 1) ? null :
+        allSingle ?
+          `${selection.length} single-photo items` :
+          `${selection.length} items`,
+
+      order: (selection.length === 1) ? null :
+        shape.order ?
+          `list order, sorted by ${shape.order}` :
+          'list order',
+
+      // Which items a document's pages were drawn from, and whether any of
+      // them was a grouping somebody had already made.
+      sourcesOf: (doc) => [...new Set(doc.photos.map(p => photoItem.get(p)))]
+        .filter(id => id != null)
+        .map(id => ({
+          id,
+          title: shape.titles.get(id),
+          grouped: (shape.sizes.get(id) ?? 1) > 1
+        }))
     }
   }
 
   // Render the scans and build one request per pass. Nothing is sent.
-  async prepare(photos, { logger, sharp, language, vocabulary, notes }) {
+  async prepare(photos, {
+    logger, sharp, language, vocabulary, notes, titles, sizes
+  }) {
     let { scanEdge, window, overlap, model, effort } = this.options
 
     let scans = await renderScans(sharp, photos, scanEdge, (done, total) => {
@@ -234,9 +306,11 @@ export default class SegmenterPlugin {
       `segmenting ${scans.length} photos in ${windows.length} pass(es), ` +
       `reporting in ${language}`)
 
+    let prompt = system(language, vocabulary, notes)
+
     return windows.map(({ start, end }) =>
       requestFor(scans.slice(start, end), start,
-        { model, effort, language, vocabulary, notes }))
+        { model, effort, system: prompt, titles, sizes }))
   }
 
   // Exact input tokens across every pass, before any of them is sent.

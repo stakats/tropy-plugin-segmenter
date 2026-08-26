@@ -47,6 +47,8 @@ export async function renderScan(sharp, photo, edge) {
   return {
     id: photo.id,
     page: photo.page,
+    item: photo.item,
+    path: photo.path,
     data,
     bytes: buffer.length,
     hash: fingerprint(data),

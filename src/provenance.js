@@ -27,13 +27,20 @@ const escape = (value) => String(value)
   .replace(/</g, '&lt;')
   .replace(/>/g, '&gt;')
 
+function assembled(sources) {
+  if (sources.length < 2) return null
+  if (!sources.some(s => s.grouped)) return null
+
+  return `pages from items ${sources.map(s => s.id).join(', ')}`
+}
+
 const field = (label, value) =>
   (value == null || value === '') ? null : `${label}: ${escape(value)}`
 
 export function provenanceNote(doc, run) {
   let {
     plugin, model, effort, scanEdge, digests, collection, runId, at,
-    source, pages
+    source, sources = [], pages, order, selection
   } = run
 
   let paragraphs = []
@@ -56,6 +63,13 @@ export function provenanceNote(doc, run) {
     field('model', effort ? `${model}, effort ${effort}` : model),
     field('images', `${scanEdge} px longest edge`),
     field('source', `item ${source.id}${pages ? `, pages ${pages}` : ''}`),
+    field('selection', selection),
+    field('order', order),
+    // Only where it says something. In the ordinary case of loose scans every
+    // document is assembled from several items, which is the point of the run
+    // rather than a thing to flag; what is worth recording is a document
+    // carried across a grouping somebody had already made.
+    field('assembled', assembled(sources)),
     field('confidence', doc.confidence),
     field('policy', digests ?
       `segmentation.md ${digests.segmentation}, metadata.md ${digests.metadata}` :

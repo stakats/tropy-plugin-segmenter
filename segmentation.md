@@ -43,7 +43,9 @@ agree, call a boundary**.
 - Change of paper: size, tone, edge, texture, ruling, watermark
 - Change in the photograph itself — background, lighting, camera distance,
   orientation. The camera often registers a new physical object before the
-  content does.
+  content does. Between two frames of the *same* page this inverts: a shift in
+  lighting, distance or angle with the same content beneath it is a reshoot,
+  not a new object.
 
 **Signals that a document continues.** These outrank a weak opening cue:
 
@@ -51,6 +53,10 @@ agree, call a boundary**.
 - A catchword at the foot repeating the next page's first word
 - Page or folio numbers continuing in sequence
 - Same hand, ink, paper and layout as the page before
+- Two consecutive frames showing the same page. A page is often reshot — for
+  focus, for glare, for a shadow — and both frames kept. Near-identical
+  consecutive frames may be one page photographed twice rather than two
+  documents.
 
 Numbering is worth special attention because it is legible when nothing else
 is: foliation restarting, or a change of archival stamp, call number or
@@ -62,6 +68,28 @@ evidence against one.
 Establish from the first few photos whether a photo holds **one leaf**, an
 **opening** (two pages at once), or a **recto/verso pair**, and apply that
 consistently. Getting it wrong doubles or halves every document in the dossier.
+
+## Pages gathered separately
+
+Where the pages in front of you were not all gathered in one act — some were
+grouped by hand into an item, others arrived from a different shoot or folder —
+the joins between those groups are marked for you.
+
+A join says only that the pages either side of it came together by different
+routes. It is not itself a boundary, and continuity is still the default. But
+the order across a join is whatever order the pages happened to be listed in,
+which may be a sort with no bearing on how the material runs, so a document
+carried across a join needs the same positive evidence any boundary call needs:
+running text, the same hand and paper, a catchword, foliation continuing.
+
+**A group may not belong with the rest at all.** Selecting a run of items easily
+takes in a neighbour that has nothing to do with them. Where a group's pages
+are unrelated to the material around them, leave them unassigned rather than
+fitting them into a neighbour's document. Unassigned pages stay exactly where
+they are, which for a group that does not belong is the right outcome.
+
+Pages *within* a group carry no such caveat: someone put them in that order, and
+they are read as ordinary consecutive pages.
 
 ## Conventions
 

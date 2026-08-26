@@ -9,6 +9,9 @@ import { costOf, describe as describeCost, formatCost, rateFor } from '../src/co
 import { typeVocabulary } from '../src/vocabulary.js'
 import { readCollectionNotes } from '../src/collection.js'
 import { MARKER, provenanceNote } from '../src/provenance.js'
+import { isSeam, seamLabel, seamsIn } from '../src/seams.js'
+import { requestFor } from '../src/model.js'
+import { folders, sortColumn } from '../src/order.js'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -847,6 +850,7 @@ describe('the provenance note', () => {
     runId: '5f3a9c1e',
     at: '2026-08-26 14:02 UTC',
     source: { id: 4759, title: 'Ribet, Jacques-Antoine' },
+    sources: [{ id: 4759, title: 'Ribet, Jacques-Antoine', grouped: true }],
     pages: '4-7'
   }
 
@@ -905,7 +909,7 @@ describe('notes on the items apply creates', () => {
     plugin: '0.2.6', model: 'claude-opus-5', effort: 'high', scanEdge: 1024,
     digests: { segmentation: 'aaaaaaaa', metadata: 'bbbbbbbb' },
     collection: null, runId: 'run12345', at: '2026-08-26 14:02 UTC',
-    sourceOf: () => ({ id: 1, title: 'A dossier' })
+    sourcesOf: () => ([{ id: 1, title: 'A dossier', grouped: true }])
   }
 
   it('writes one for every item, not only the doubtful ones', async () => {
@@ -991,5 +995,215 @@ describe('pricing.json', () => {
       assert.ok(rate.input > 0, `${model} input`)
       assert.ok(rate.output > rate.input, `${model} output`)
     }
+  })
+})
+
+describe('seams', () => {
+  // A scan, as prepare() builds it: which item it is on, and where its file is.
+  const scan = (id, item, dir = '/shoot') =>
+    ({ id, item, path: `${dir}/IMG_${id}.jpg` })
+
+  const sizes = (...pairs) => new Map(pairs)
+
+  it('finds none in a pile of scans dragged in together', () => {
+    // The commonest project by far: forty items, one photo each, one folder.
+    let scans = [1, 2, 3, 4, 5].map(i => scan(i, i))
+    let sizes_ = sizes(...scans.map(s => [s.item, 1]))
+
+    assert.equal(seamsIn(scans, sizes_).size, 0)
+  })
+
+  it('finds one where a grouped item begins', () => {
+    let scans = [scan(1, 10), scan(2, 11), scan(3, 11)]
+    // Item 11 holds two photos: somebody put them together.
+    assert.deepEqual([...seamsIn(scans, sizes([10, 1], [11, 2]))], [1])
+  })
+
+  it('finds one between separately gathered single scans', () => {
+    // The case a photo-count rule would miss: two shoots, one photo each.
+    let scans = [scan(1, 10, '/ribet'), scan(2, 11, '/dunois')]
+    assert.deepEqual([...seamsIn(scans, sizes([10, 1], [11, 1]))], [1])
+  })
+
+  it('finds none inside a grouped item', () => {
+    let scans = [scan(1, 10), scan(2, 10), scan(3, 10)]
+    assert.equal(seamsIn(scans, sizes([10, 3])).size, 0)
+  })
+
+  it('stays silent when a managed project puts everything in one store', () => {
+    // Every photo in the project's own store, every item single-photo.
+    let scans = [1, 2, 3].map(i => scan(i, i, '/project.tpy/store'))
+    assert.equal(seamsIn(scans, sizes([1, 1], [2, 1], [3, 1])).size, 0)
+  })
+
+  it('names what actually differs', () => {
+    let titles = new Map([[10, 'Ribet'], [11, 'Dunois']])
+    let grouped = sizes([10, 3], [11, 2])
+
+    assert.match(
+      seamLabel(scan(1, 10), scan(2, 11), { titles, sizes: grouped }),
+      /Ribet ends here and Dunois begins/)
+
+    // A folder change between two loose scans says so, and names no items.
+    let loose = sizes([10, 1], [11, 1])
+    let label = seamLabel(
+      scan(1, 10, '/a'), scan(2, 11, '/b'), { titles, sizes: loose })
+    assert.match(label, /different folders/)
+    assert.ok(!label.includes('Ribet'))
+  })
+
+  it('falls back to the item id when an item has no title', () => {
+    assert.match(
+      seamLabel(scan(1, 10), scan(2, 11), { titles: new Map(), sizes: sizes([10, 2], [11, 1]) }),
+      /item 10 ends here and item 11 begins/)
+  })
+
+  it('is not a seam at the edges of the sequence', () => {
+    assert.equal(isSeam(undefined, scan(1, 10), sizes()), false)
+    assert.equal(isSeam(scan(1, 10), undefined, sizes()), false)
+  })
+})
+
+describe('reading the list order', () => {
+  const T = 'http://purl.org/dc/elements/1.1/title'
+
+  it('names the column the list is sorted by', () => {
+    assert.equal(sortColumn({ nav: { list: null, sort: { 0: { column: T } } } }), 'Title')
+    assert.equal(
+      sortColumn({ nav: { list: null, sort: { 0: { column: 'added' } } } }),
+      'Position')
+  })
+
+  it('reads the sort of the list actually being viewed', () => {
+    let state = {
+      nav: { list: 7, sort: { 0: { column: T }, 7: { column: 'item.created' } } }
+    }
+    assert.equal(sortColumn(state), 'Date Added')
+  })
+
+  it('does the best it can with a column it does not know', () => {
+    assert.equal(
+      sortColumn({ nav: { sort: { 0: { column: 'http://x.org/ns#shelfmark' } } } }),
+      'shelfmark')
+  })
+
+  it('says nothing rather than guessing when nothing is sorted', () => {
+    assert.equal(sortColumn({ nav: {} }), null)
+    assert.equal(sortColumn({}), null)
+  })
+
+  it('collapses to one folder where a project manages its own files', () => {
+    assert.deepEqual(
+      folders([{ path: '/store/a.jpg' }, { path: '/store/b.jpg' }]), ['/store'])
+  })
+
+  it('ignores photos that are not local files', () => {
+    assert.deepEqual(folders([{ protocol: 'https', path: 'x' }, {}]), [])
+  })
+})
+
+describe('what the request tells the model', () => {
+  const scan = (id, item, dir = '/shoot') => ({
+    id, item, page: 0, path: `${dir}/IMG_${id}.jpg`,
+    data: 'x', type: 'image/jpeg'
+  })
+  const textOf = (req) => req.messages[0].content
+    .filter(b => b.type === 'text').map(b => b.text)
+
+  it('says nothing about gathering when nothing was gathered separately', () => {
+    let scans = [1, 2, 3].map(i => scan(i, i))
+    let text = textOf(requestFor(scans, 0, {
+      sizes: new Map([[1, 1], [2, 1], [3, 1]])
+    }))
+
+    assert.ok(!text.some(t => /gathered separately/.test(t)))
+    assert.ok(!text.some(t => /^—/.test(t)))
+  })
+
+  it('marks a join without spending a page number on it', () => {
+    let scans = [scan(1, 10), scan(2, 11), scan(3, 11)]
+    let text = textOf(requestFor(scans, 0, {
+      titles: new Map([[10, 'Loose scan'], [11, 'Dossier']]),
+      sizes: new Map([[10, 1], [11, 2]])
+    }))
+
+    assert.ok(text.some(t => /gathered separately/.test(t)))
+    // Pages still run 1..3 with the marker between them.
+    assert.deepEqual(text.filter(t => /^Page /.test(t)), ['Page 1', 'Page 2', 'Page 3'])
+    let marker = text.findIndex(t => /^—/.test(t))
+    assert.equal(text[marker + 1], 'Page 2')
+  })
+
+  it('numbers pages from the window offset, markers and all', () => {
+    let scans = [scan(4, 10), scan(5, 11)]
+    let text = textOf(requestFor(scans, 3, {
+      sizes: new Map([[10, 2], [11, 2]])
+    }))
+    assert.deepEqual(text.filter(t => /^Page /.test(t)), ['Page 4', 'Page 5'])
+  })
+
+  it('asks for pages that belong elsewhere to be left where they are', () => {
+    let schema = requestFor([scan(1, 10)], 0, {}).output_config.format.schema
+    assert.match(
+      schema.properties.unassigned.description,
+      /leave exactly where they are/)
+    assert.match(
+      schema.properties.unassigned.description, /nothing to do with the rest/)
+  })
+})
+
+describe('the note on a run that spans several items', () => {
+  const base = {
+    plugin: '0.3.0', model: 'claude-opus-5', effort: 'high', scanEdge: 1024,
+    digests: { segmentation: 'aaaaaaaa', metadata: 'bbbbbbbb' },
+    collection: null, runId: 'run12345', at: '2026-08-26 14:02 UTC',
+    source: { id: 10, title: 'Ribet' }, pages: '4-7'
+  }
+
+  it('records the order the pages were read in', () => {
+    let html = provenanceNote({}, {
+      ...base,
+      selection: '44 single-photo items',
+      order: 'list order, sorted by Title'
+    })
+    assert.match(html, /selection: 44 single-photo items/)
+    assert.match(html, /order: list order, sorted by Title/)
+  })
+
+  it('says nothing about order for a single item', () => {
+    let html = provenanceNote({}, { ...base, selection: null, order: null })
+    assert.ok(!html.includes('selection:'))
+    assert.ok(!html.includes('order:'))
+  })
+
+  it('flags a document carried across a grouping somebody made', () => {
+    let html = provenanceNote({}, {
+      ...base,
+      sources: [
+        { id: 10, title: 'Ribet', grouped: true },
+        { id: 11, title: 'A scan', grouped: false }
+      ]
+    })
+    assert.match(html, /assembled: pages from items 10, 11/)
+  })
+
+  // In the ordinary pile-of-scans run every document spans several items,
+  // which is the point of the run rather than something to flag.
+  it('does not flag the ordinary joining of loose scans', () => {
+    let html = provenanceNote({}, {
+      ...base,
+      sources: [
+        { id: 10, title: 'IMG_5144', grouped: false },
+        { id: 11, title: 'IMG_5145', grouped: false }
+      ]
+    })
+    assert.ok(!html.includes('assembled:'))
+  })
+
+  it('does not flag a document that stayed inside one item', () => {
+    let html = provenanceNote({}, {
+      ...base, sources: [{ id: 10, title: 'Ribet', grouped: true }]
+    })
+    assert.ok(!html.includes('assembled:'))
   })
 })

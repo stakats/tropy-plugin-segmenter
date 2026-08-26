@@ -1,7 +1,7 @@
 {
   "name": "tropy-plugin-segmenter",
   "productName": "Segmenter",
-  "version": "0.2.7",
+  "version": "0.3.0",
   "description": "Group a batch-scanned item's photos into document-level items",
   "author": {
     "name": "Corporation for Digital Scholarship",
@@ -94,7 +94,7 @@
       "label": "Collection notes (Markdown file)",
       "type": "file",
       "required": false,
-      "hint": "What is true of this collection but not of archives generally \u2014 its calendar, its document types, how its covers and surrogates behave. Appended to the built-in policy at run time."
+      "hint": "What is true of this collection but not of archives generally — its calendar, its document types, how its covers and surrogates behave. Appended to the built-in policy at run time."
     },
     {
       "field": "reviewTag",
