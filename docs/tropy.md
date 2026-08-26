@@ -29,7 +29,7 @@ through, which is how `page` and `density` reach it.
 guarantees it stays there.
 
 **The export payload carries no ids.** `getExportItems`
-(`src/selectors/export.js:13`) serialises through a whitelist
+(`src/selectors/export.js:13`) serializes through a whitelist
 (`src/common/export.js:50-97`): photos get `checksum`, `filename`, `path`,
 `page`, `mimetype`; items get `template` plus metadata, tags and lists. No item
 id, no photo id. Treat the hook as a trigger and read `state.nav.items`

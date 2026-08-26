@@ -212,7 +212,7 @@ export default class SegmenterPlugin {
     let usage = { input: 0, output: 0 }
 
     // Serial, because each window's reading of the overlap depends on how the
-    // previous window ended. Windows are independent enough to parallelise —
+    // previous window ended. Windows are independent enough to parallelize —
     // see NOTES.md — but that is a change to the policy, not to the plumbing.
     for (let request of requests) {
       let pass = await segment(client, request, logger)

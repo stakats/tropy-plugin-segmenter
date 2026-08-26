@@ -223,7 +223,7 @@ printing a confident wrong number. The two rate options override the table.
 
 Dates are transcribed, not interpreted. A document that says
 `16 frimaire an 11` is recorded as `16 frimaire an 11` — not converted to
-`1802-12-07`, not rewritten as ISO, not modernised from `7bre` to `septembre`,
+`1802-12-07`, not rewritten as ISO, not modernized from `7bre` to `septembre`,
 and never given a day or month the page does not carry.
 
 What is dropped is only what is not the date: the place, and the words that
@@ -251,7 +251,7 @@ wanted later, it belongs in its own field, marked as derived.
   guarantees it stays there.
 - **A whole run is many undo entries, not one.** Explode, each merge, each
   metadata write and the tag each register separately.
-- **Passes run serially.** They are independent enough to parallelise — see
+- **Passes run serially.** They are independent enough to parallelize — see
   `docs/notes.md` — but that is a change worth measuring first.
 - **There is no second pass.** `NOTES.md` argues pass 2 should visit only what
   pass 1 flagged; for now pass 1 records a confidence and the report surfaces

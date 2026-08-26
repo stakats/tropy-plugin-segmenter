@@ -53,7 +53,7 @@ ${vocabulary.map(({ term, count }) => `- ${term} — ${count}`).join('\n')}
 Prefer an existing term to a new one, and a widely used term to a rarely used
 one: the counts are the evidence of what this project's convention actually is,
 and a term used once may be a leftover rather than a practice. Copy the wording
-and capitalisation exactly, so the field stays sortable.
+and capitalization exactly, so the field stays sortable.
 
 Coin a new term only when nothing above describes the document. A term you coin
 should be short and singular and match the language and style of the list, and

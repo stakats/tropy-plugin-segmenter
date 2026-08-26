@@ -24,8 +24,8 @@ So, for every field taken from the page:
   be arithmetically right and still be an inference wearing the clothes of a
   transcription.
 - **Do not normalize to a standard format.** A date is not rewritten as ISO,
-  and a name is not reordered or regularised.
-- **Do not modernise spelling**, expand abbreviations, or correct what looks
+  and a name is not reordered or regularized.
+- **Do not modernize spelling**, expand abbreviations, or correct what looks
   like a slip. Archaic and irregular forms are evidence.
 - **Do not supply precision the document does not carry.** If only the month is
   given, record the month. An approximate date stays approximate, and a range
