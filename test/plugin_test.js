@@ -113,17 +113,21 @@ describe('resolve', () => {
   })
 })
 
-// A stand-in for Tropy's store that behaves the way the real explode and merge
-// commands do: asynchronously, and reporting the result only through state.
-function fakeStore({ batchId = 1, photos = [11, 12, 13, 14] } = {}) {
+// A stand-in for Tropy's store, modelled on what the real commands do:
+// asynchronously, reporting results only through state.
+//
+// `shape` maps an item id to its photo ids, so a dossier is {1: [11,12,13]}
+// and a pile of separately imported scans is {1: [11], 2: [12], 3: [13]}.
+function fakeProject({ shape = { 1: [11, 12, 13, 14] }, metadata = {} } = {}) {
   let next = 100
   let listeners = []
 
-  let state = {
-    items: { [batchId]: { id: batchId, photos: [...photos], tags: [] } },
-    photos: Object.fromEntries(photos.map(id => [id, { id, item: batchId }])),
-    metadata: {},
-    tags: {}
+  let state = { items: {}, photos: {}, metadata: { ...metadata }, tags: {} }
+
+  for (let [id, photos] of Object.entries(shape)) {
+    state.items[id] = { id: Number(id), photos: [...photos], tags: [] }
+    for (let photo of photos)
+      state.photos[photo] = { id: photo, item: Number(id) }
   }
 
   let notify = () => { for (let fn of [...listeners]) fn() }
@@ -140,16 +144,20 @@ function fakeStore({ batchId = 1, photos = [11, 12, 13, 14] } = {}) {
       setTimeout(() => {
         switch (action.type) {
           case 'item.explode': {
+            let from = action.payload.id
             for (let photo of action.payload.photos) {
               let id = ++next
+              // Explode duplicates the item, so metadata and tags come too.
               state.items[id] = {
-                id, photos: [photo], tags: [...state.items[batchId].tags]
+                id, photos: [photo], tags: [...state.items[from].tags]
               }
+              if (state.metadata[from])
+                state.metadata[id] = { ...state.metadata[from] }
               state.photos[photo] = { ...state.photos[photo], item: id }
             }
-            state.items[batchId] = {
-              ...state.items[batchId],
-              photos: state.items[batchId].photos
+            state.items[from] = {
+              ...state.items[from],
+              photos: state.items[from].photos
                 .filter(p => !action.payload.photos.includes(p))
             }
             break
@@ -157,18 +165,36 @@ function fakeStore({ batchId = 1, photos = [11, 12, 13, 14] } = {}) {
           case 'item.merge': {
             let [target, ...rest] = action.payload
             let folded = rest.flatMap(id => state.items[id].photos)
+            let tags = new Set(state.items[target].tags)
+            // Tropy fills in properties the target lacks from the items being
+            // merged in, first one wins, and unions tags — models/item.js:311.
+            let data = { ...state.metadata[target] }
+
+            for (let id of rest) {
+              for (let [prop, value] of Object.entries(state.metadata[id] ?? {}))
+                if (!(prop in data)) data[prop] = value
+              for (let tag of state.items[id].tags) tags.add(tag)
+            }
+
             state.items[target] = {
               ...state.items[target],
-              photos: [...state.items[target].photos, ...folded]
+              photos: [...state.items[target].photos, ...folded],
+              tags: [...tags]
             }
-            for (let id of rest) delete state.items[id]
-            for (let p of folded) state.photos[p] = { ...state.photos[p], item: target }
+            if (Object.keys(data).length > 0) state.metadata[target] = data
+
+            for (let id of rest) {
+              delete state.items[id]
+              delete state.metadata[id]
+            }
+            for (let p of folded)
+              state.photos[p] = { ...state.photos[p], item: target }
             break
           }
           case 'metadata.save':
-            // Tropy's Save command destructures `{ ids, data }` and treats
-            // ids as an array — see src/commands/metadata/save.js. The fake
-            // must be just as strict, or it hides a wrong payload shape.
+            // Tropy's Save command destructures `{ ids, data }` and treats ids
+            // as an array — src/commands/metadata/save.js. The fake must be
+            // just as strict, or it hides a wrong payload shape.
             if (!Array.isArray(action.payload.ids))
               throw new Error('metadata.save needs payload.ids as an array')
             // metadata_values.datatype is NOT NULL, and Tropy only fills it in
@@ -179,7 +205,9 @@ function fakeStore({ batchId = 1, photos = [11, 12, 13, 14] } = {}) {
                 throw new Error(`metadata value for ${uri} has no datatype`)
             }
             for (let id of action.payload.ids)
-              state.metadata[id] = { ...action.payload.data }
+              state.metadata[id] = {
+                ...state.metadata[id], ...action.payload.data
+              }
             break
           case 'tag.create': {
             let id = ++next
@@ -199,6 +227,12 @@ function fakeStore({ batchId = 1, photos = [11, 12, 13, 14] } = {}) {
     }
   }
 }
+
+const fakeStore = () => fakeProject()
+const looseScans = (n) => fakeProject({
+  shape: Object.fromEntries(
+    Array.from({ length: n }, (_, i) => [i + 1, [11 + i]]))
+})
 
 describe('apply', () => {
   it('explodes and merges a manifest into document-level items', async () => {
@@ -563,69 +597,6 @@ describe('readCollectionNotes', () => {
   })
 })
 
-// A pile of separately imported scans: one photo per item, which is the
-// already-exploded state.
-function looseScans(count) {
-  let next = 100
-  let listeners = []
-
-  let state = { items: {}, photos: {}, metadata: {}, tags: {} }
-
-  for (let i = 1; i <= count; ++i) {
-    state.items[i] = { id: i, photos: [10 + i], tags: [] }
-    state.photos[10 + i] = { id: 10 + i, item: i }
-  }
-
-  let notify = () => { for (let fn of [...listeners]) fn() }
-
-  return {
-    getState: () => state,
-    subscribe(fn) {
-      listeners.push(fn)
-      return () => { listeners = listeners.filter(x => x !== fn) }
-    },
-    dispatch(action) {
-      setTimeout(() => {
-        switch (action.type) {
-          case 'item.explode': {
-            for (let photo of action.payload.photos) {
-              let id = ++next
-              state.items[id] = { id, photos: [photo], tags: [] }
-              state.photos[photo] = { ...state.photos[photo], item: id }
-            }
-            let from = action.payload.id
-            state.items[from] = {
-              ...state.items[from],
-              photos: state.items[from].photos
-                .filter(p => !action.payload.photos.includes(p))
-            }
-            break
-          }
-          case 'item.merge': {
-            let [target, ...rest] = action.payload
-            let folded = rest.flatMap(id => state.items[id].photos)
-            state.items[target] = {
-              ...state.items[target],
-              photos: [...state.items[target].photos, ...folded]
-            }
-            for (let id of rest) delete state.items[id]
-            for (let p of folded)
-              state.photos[p] = { ...state.photos[p], item: target }
-            break
-          }
-          case 'metadata.save':
-            for (let id of action.payload.ids)
-              state.metadata[id] = { ...action.payload.data }
-            break
-          default:
-            throw new Error(`unexpected action ${action.type}`)
-        }
-        notify()
-      }, 0)
-    }
-  }
-}
-
 describe('apply, over a pile of separately imported scans', () => {
   it('merges them into documents without exploding anything', async () => {
     let store = looseScans(6)
@@ -703,5 +674,101 @@ describe('the selection', () => {
       items: { 1: { photos: [11, 12] }, 2: { photos: [21] }, 3: {} }
     }
     assert.deepEqual(getPhotoSequence(state, [1, 2, 3]), [11, 12, 21])
+  })
+})
+
+describe('apply, over a selection that mixes both shapes', () => {
+  const TITLE = 'http://purl.org/dc/elements/1.1/title'
+
+  // Item 1 is a small dossier, items 2 and 3 are loose scans, item 4 is a
+  // two-photo item. Pages read 11,12,13 | 21 | 31 | 41,42.
+  const mixed = () => fakeProject({
+    shape: { 1: [11, 12, 13], 2: [21], 3: [31], 4: [41, 42] },
+    metadata: {
+      1: { [TITLE]: { text: 'Dossier' } },
+      2: { [TITLE]: { text: 'A scan I labeled myself' } }
+    }
+  })
+
+  const pages = [11, 12, 13, 21, 31, 41, 42]
+
+  it('explodes only the items that hold more than one photo', async () => {
+    let store = mixed()
+    let exploded = []
+    let dispatch = store.dispatch
+    store.dispatch = (a) => {
+      if (a.type === 'item.explode') exploded.push(a.payload.id)
+      return dispatch(a)
+    }
+
+    let documents = resolve({
+      documents: [
+        { first: 1, last: 2, title: 'One' },
+        { first: 3, last: 4, title: 'Two' },
+        { first: 5, last: 7, title: 'Three' }
+      ]
+    }, pages)
+
+    let { items } = await apply(store, {
+      items: [1, 2, 3, 4], documents, reviewTag: null
+    })
+
+    assert.deepEqual(exploded.sort(), [1, 4])
+
+    let state = store.getState()
+    assert.deepEqual(state.items[items[0]].photos, [11, 12])
+    // A document spanning a dossier page and a loose scan.
+    assert.deepEqual(state.items[items[1]].photos, [13, 21])
+    assert.deepEqual(state.items[items[2]].photos, [31, 41, 42])
+  })
+
+  // Each document is built on whichever item held its *first* page, which is
+  // what decides the fate of a loose scan: one that starts a document becomes
+  // that document, one that falls inside it is merged away.
+  it('builds each document on the item that held its first page', async () => {
+    let store = mixed()
+
+    let documents = resolve({
+      documents: [
+        { first: 1, last: 2, title: 'One' },
+        { first: 3, last: 4, title: 'Two' },
+        { first: 5, last: 7, title: 'Three' }
+      ]
+    }, pages)
+
+    let { items } = await apply(store, {
+      items: [1, 2, 3, 4], documents, reviewTag: null
+    })
+
+    let state = store.getState()
+
+    // Items 1 and 4 were split, so they survive holding no photos.
+    assert.deepEqual(state.items[1].photos, [])
+    assert.deepEqual(state.items[4].photos, [])
+
+    // Item 2 held page 4, inside document Two, so it was merged away.
+    assert.equal(state.items[2], undefined)
+
+    // Item 3 held page 5, the first of document Three, so it *is* that
+    // document, and now holds item 4's photos too.
+    assert.equal(items[2], 3)
+    assert.deepEqual(state.items[3].photos, [31, 41, 42])
+  })
+
+  it('overwrites a label the user had already put on a loose scan', async () => {
+    let store = mixed()
+
+    // Page 4 is item 2, which the user titled themselves.
+    let documents = resolve(
+      { documents: [{ first: 4, last: 4, title: 'What the model called it' }] },
+      pages)
+
+    let { items } = await apply(store, {
+      items: [1, 2, 3, 4], documents, reviewTag: null
+    })
+
+    assert.equal(
+      store.getState().metadata[items[0]][TITLE].text,
+      'What the model called it')
   })
 })

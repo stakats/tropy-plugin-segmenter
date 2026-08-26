@@ -115,6 +115,21 @@ Photos are read in the order the item list shows them, and within each item in
 photo order — so sort the list the way the documents run before you start. The
 order you happened to click in makes no difference.
 
+A selection can mix the two shapes freely, and a document can span them — the
+last page of a dossier and the loose scan that follows it can end up in the
+same document. Two rules govern what happens to the items you started with:
+
+- **An item holding more than one photo is split, and survives holding none.**
+  It keeps whatever it recorded, which is the point when it was a dossier: the
+  dossier-level description stays somewhere. When it was just a two-page scan,
+  it is an empty item you may want to delete.
+- **Each document is built on whichever item held its first page**, and
+  inherits that item's metadata. So a loose scan that begins a document becomes
+  that document; one that falls inside it is merged away. Tropy fills in any
+  property the surviving item lacks from the ones merged into it, and unions
+  their tags, so labels are not silently lost — but anything the plugin writes
+  does overwrite what was there.
+
 Two things about that placement are worth knowing, because both look like bugs:
 
 - **Nothing is exported.** Tropy has no segmentation hook and plugins cannot
