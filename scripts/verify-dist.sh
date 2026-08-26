@@ -42,16 +42,16 @@ echo "$LISTING" | grep -qE 'node_modules|/src/|/test/|\.map$' \
   && fail "archive contains build or development files" || true
 
 # The bundle has to stand alone: Tropy never installs a plugin's dependencies.
-unzip -p "$ZIP" "$STAGE/index.js" > /tmp/segmenter-bundle.js
-grep -qE "require\(['\"][^.n]" /tmp/segmenter-bundle.js \
+unzip -p "$ZIP" "$STAGE/index.js" > /tmp/segment-bundle.js
+grep -qE "require\(['\"][^.n]" /tmp/segment-bundle.js \
   && fail "bundle requires an external module at run time" || true
-grep -q "module.exports" /tmp/segmenter-bundle.js \
+grep -q "module.exports" /tmp/segment-bundle.js \
   || fail "bundle does not export the plugin"
 
 # What Tropy reads before it will show the plugin at all.
-unzip -p "$ZIP" "$STAGE/package.json" > /tmp/segmenter-pkg.json
+unzip -p "$ZIP" "$STAGE/package.json" > /tmp/segment-pkg.json
 node -e '
-  const pkg = require("/tmp/segmenter-pkg.json")
+  const pkg = require("/tmp/segment-pkg.json")
   const expect = (ok, why) => { if (!ok) { console.error("verify: " + why); process.exit(1) } }
   expect(pkg.name === process.argv[1], "name in the archive is " + pkg.name)
   expect(pkg.version === process.argv[2], "version in the archive is " + pkg.version)
@@ -63,7 +63,7 @@ node -e '
   expect(typeof pkg.productName === "string", "no productName for the plugin list")
 ' "$NAME" "$VERSION"
 
-rm -f /tmp/segmenter-bundle.js /tmp/segmenter-pkg.json
+rm -f /tmp/segment-bundle.js /tmp/segment-pkg.json
 
 SIZE=$(du -k "$ZIP" | cut -f1)
 echo "verify: $ZIP is installable (${SIZE}KB, $(echo "$LISTING" | grep -c . ) entries)"

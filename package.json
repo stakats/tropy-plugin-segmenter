@@ -1,7 +1,7 @@
 {
-  "name": "tropy-plugin-segmenter",
-  "productName": "Segmenter",
-  "version": "0.3.0",
+  "name": "tropy-plugin-segment",
+  "productName": "Segment",
+  "version": "0.4.0",
   "description": "Group a batch-scanned item's photos into document-level items",
   "author": {
     "name": "Corporation for Digital Scholarship",
@@ -25,7 +25,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/stakats/tropy-plugin-segmenter.git"
+    "url": "git+https://github.com/stakats/tropy-plugin-segment.git"
   },
   "license": "AGPL-3.0-or-later",
   "hooks": {
@@ -130,7 +130,7 @@
     "rollup-plugin-license": "^3.5.0"
   },
   "bugs": {
-    "url": "https://github.com/stakats/tropy-plugin-segmenter/issues"
+    "url": "https://github.com/stakats/tropy-plugin-segment/issues"
   },
-  "homepage": "https://github.com/stakats/tropy-plugin-segmenter#readme"
+  "homepage": "https://github.com/stakats/tropy-plugin-segment#readme"
 }

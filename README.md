@@ -1,4 +1,4 @@
-# Segmenter — a Tropy plugin
+# Segment — a Tropy plugin
 
 Works out where the documents are in a pile of scans, and makes each one its
 own item — in place, inside Tropy.
@@ -67,7 +67,7 @@ through Claude Opus 5.
 > Replacing an existing install needs Tropy to be **fully quit and relaunched**;
 > a first install does not. See *Developing* for why.
 
-[releases]: https://github.com/stakats/tropy-plugin-segmenter/releases
+[releases]: https://github.com/stakats/tropy-plugin-segment/releases
 [key]: https://console.anthropic.com/settings/keys
 
 ## Options
@@ -235,7 +235,7 @@ judgement, and enough about the run to weigh it:
 > Pages 4–7 of Ribet, Jacques-Antoine, judged from 1024 px copies by
 > claude-opus-5.
 >
-> > marker: tropy-segmenter/1
+> > marker: tropy-segment/1
 > > run: 5f3a9c1e, 2026-08-26 14:02 UTC
 > > plugin: 0.2.6
 > > model: claude-opus-5, effort high
@@ -258,7 +258,9 @@ migrated from. That shapes them:
   item exported on its own must still carry its own provenance. The `run` id is
   what groups one run's items back together.
 - **Parseable.** The marker and the labels are fixed strings, and the labels
-  stay in English whatever language the remark is in.
+  stay in English whatever language the remark is in. Notes written before the
+  plugin was renamed carry `tropy-segmenter/1` instead of `tropy-segment/1`;
+  the shape is identical, and anything reading these notes should accept both.
 - **Honest about what was seen.** The scan size matters more than anything else
   here. A date misread from a 1024 px copy is a different kind of error from one
   misread at full resolution, and nothing else in Tropy records it.
@@ -377,7 +379,7 @@ npm test          # lint, build, and the unit tests
 npm run dist      # build, package, and check the archive is installable
 ```
 
-`npm run dist` writes `dist/tropy-plugin-segmenter-<version>.zip` and a
+`npm run dist` writes `dist/tropy-plugin-segment-<version>.zip` and a
 `SHA256SUMS` beside it, then runs `scripts/verify-dist.sh` over the result. That
 check exists because every invariant in it has been got wrong at least once:
 one top-level directory named for the version, exactly the six files Tropy

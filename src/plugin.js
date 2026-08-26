@@ -47,7 +47,7 @@ function timestamp() {
   return new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
 }
 
-export default class SegmenterPlugin {
+export default class SegmentPlugin {
 
   constructor(options, context) {
     this.options = { ...defaults(), ...options }
@@ -195,7 +195,7 @@ export default class SegmenterPlugin {
       })
 
     } catch (err) {
-      logger?.error({ stack: err.stack }, `segmenter: ${err.message}`)
+      logger?.error({ stack: err.stack }, `segment: ${err.message}`)
       await dialog.show('message-box', {
         type: 'error',
         message: 'Could not segment this item',

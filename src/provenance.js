@@ -20,7 +20,12 @@
 //   one misread at full resolution, and nothing else in Tropy records it.
 
 // Bumped only if the shape below changes in a way a parser would care about.
-export const MARKER = 'tropy-segmenter/1'
+export const MARKER = 'tropy-segment/1'
+
+// Notes written before the plugin was renamed carry `tropy-segmenter/1`. The
+// shape is identical; anything migrating these notes into a real provenance
+// layer has to accept both.
+export const MARKERS = ['tropy-segment/1', 'tropy-segmenter/1']
 
 const escape = (value) => String(value)
   .replace(/&/g, '&amp;')

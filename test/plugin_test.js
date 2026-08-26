@@ -8,7 +8,7 @@ import { languageName } from '../src/locale.js'
 import { costOf, describe as describeCost, formatCost, rateFor } from '../src/cost.js'
 import { typeVocabulary } from '../src/vocabulary.js'
 import { readCollectionNotes } from '../src/collection.js'
-import { MARKER, provenanceNote } from '../src/provenance.js'
+import { MARKER, MARKERS, provenanceNote } from '../src/provenance.js'
 import { isSeam, seamLabel, seamsIn } from '../src/seams.js'
 import { requestFor } from '../src/model.js'
 import { folders, sortColumn } from '../src/order.js'
@@ -610,7 +610,7 @@ describe('readCollectionNotes', () => {
   let dir
 
   before(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'segmenter-test-'))
+    dir = await mkdtemp(join(tmpdir(), 'segment-test-'))
   })
 
   const write = async (name, body) => {
@@ -853,6 +853,13 @@ describe('the provenance note', () => {
     sources: [{ id: 4759, title: 'Ribet, Jacques-Antoine', grouped: true }],
     pages: '4-7'
   }
+
+  it('keeps the marker its predecessor used findable', () => {
+    // Notes written before the rename say tropy-segmenter/1, and a migration
+    // has to find those too.
+    assert.ok(MARKERS.includes(MARKER))
+    assert.ok(MARKERS.includes('tropy-segmenter/1'))
+  })
 
   it('is written even when there is nothing to remark on', () => {
     let html = provenanceNote({ confidence: 'high' }, run)

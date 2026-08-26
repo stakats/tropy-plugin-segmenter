@@ -33,6 +33,7 @@ jobs:
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_ENV"
+          echo "archive=dist/$(node -p "require('./package.json').name")-$VERSION.zip" >> "$GITHUB_ENV"
 
       # Builds the archive and checks it is installable: one top-level
       # directory, the six files Tropy needs, no runtime dependencies, and the
@@ -47,7 +48,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/tropy-plugin-segmenter-${{ env.version }}.zip
+            ${{ env.archive }}
             dist/SHA256SUMS
           prerelease: true
           generate_release_notes: true
@@ -56,5 +57,5 @@ jobs:
             choose the `.zip` below. Then add an instance with the `+` button,
             give it a name, and paste an Anthropic API key into its settings.
 
-            See the [README](https://github.com/stakats/tropy-plugin-segmenter#readme)
+            See the [README](https://github.com/stakats/tropy-plugin-segment#readme)
             for what it does and what it costs. Start with **Dry run** on.
