@@ -1,6 +1,7 @@
 import { dispatchAndWait } from './store.js'
 import {
-  explode, merge, addTag, saveMetadata, PROPERTIES, DATE_TYPE, TEXT_TYPE
+  explode, merge, addTag, createNote, saveMetadata,
+  PROPERTIES, DATE_TYPE, TEXT_TYPE
 } from './constants.js'
 
 const TAG_CREATE = 'tag.create'
@@ -15,14 +16,30 @@ function metadataFor(doc) {
   if (doc.recipient) data[PROPERTIES.recipient] = text(doc.recipient)
   if (doc.date) data[PROPERTIES.date] = { text: doc.date, type: DATE_TYPE }
 
-  let note = [
-    doc.confidence ? `confidence: ${doc.confidence}` : null,
-    doc.note || null
-  ].filter(Boolean).join(' — ')
-
-  if (note) data[PROPERTIES.description] = text(note)
-
   return data
+}
+
+const escape = (value) => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+
+// What the model has to say *about* a document, as opposed to what it recorded
+// about it. This used to be crammed into dc:description, which put prose in a
+// field sized for a value and conflated a remark to the reader with
+// descriptive metadata.
+function noteFor(doc) {
+  let paragraphs = []
+
+  if (doc.note) paragraphs.push(escape(doc.note))
+
+  if (doc.confidence && doc.confidence !== 'high')
+    paragraphs.push(
+      `Segmented at <em>${escape(doc.confidence)}</em> confidence.`)
+
+  if (paragraphs.length === 0) return null
+
+  return paragraphs.map(text => `<p>${text}</p>`).join('')
 }
 
 // Get every photo onto an item of its own, then merge each document's photos
@@ -37,7 +54,8 @@ function metadataFor(doc) {
 // as a shell holding whatever it recorded. Both commands register undo.
 export async function apply(store, options) {
   let {
-    items: sources, documents, reviewTag, logger, onProgress, timeout = 15000
+    items: sources, documents, reviewTag, lowConfidenceTag, logger,
+    onProgress, timeout = 15000
   } = options
 
   let assigned = documents.flatMap(doc => doc.photos)
@@ -153,6 +171,49 @@ export async function apply(store, options) {
     }
   }
 
+  // Notes go on the photo each document opens with, since notes belong to
+  // photos rather than to items.
+  let notes = 0
+
+  for (let i = 0; i < documents.length; ++i) {
+    let html = noteFor(documents[i])
+
+    if (!html) continue
+
+    let photo = documents[i].photos[0]
+    let before = store.getState().photos[photo]?.notes?.length ?? 0
+
+    try {
+      await dispatchAndWait(
+        store,
+        createNote({ photo, text: html }),
+        (s) => (s.photos[photo]?.notes?.length ?? 0) > before,
+        { label: `note on photo ${photo}`, timeout })
+
+      notes += 1
+
+    } catch (err) {
+      logger?.warn({ err }, `could not add a note to photo ${photo}`)
+      warnings.push(`no note on item ${created[i]}: ${err.message}`)
+    }
+  }
+
+  // Everything gets the review tag, so the review tag cannot tell you where to
+  // look. This one can.
+  if (lowConfidenceTag) {
+    let uncertain = created.filter((id, i) =>
+      documents[i].confidence && documents[i].confidence !== 'high')
+
+    if (uncertain.length > 0) {
+      try {
+        await tag(store, uncertain, lowConfidenceTag, timeout)
+      } catch (err) {
+        logger?.warn({ err }, 'could not tag the uncertain items')
+        warnings.push(`not tagged "${lowConfidenceTag}": ${err.message}`)
+      }
+    }
+  }
+
   if (reviewTag) {
     try {
       await tag(store, created, reviewTag, timeout)
@@ -162,7 +223,7 @@ export async function apply(store, options) {
     }
   }
 
-  return { items: created, warnings }
+  return { items: created, notes, warnings }
 }
 
 // `item.tag.create` resolves tag names but does not create missing tags, and

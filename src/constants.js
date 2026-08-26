@@ -15,6 +15,10 @@ export const METADATA = {
   SAVE: 'metadata.save'
 }
 
+export const NOTE = {
+  CREATE: 'note.create'
+}
+
 // Every command Tropy registers in its undo history carries this meta.
 const CMD = { cmd: 'project', history: 'add', search: true }
 
@@ -23,6 +27,17 @@ export const explode = (payload) =>
 
 export const merge = (items) =>
   ({ type: ITEM.MERGE, payload: items, meta: { ...CMD } })
+
+// Notes belong to a photo, not to an item: only `photos` and `selections`
+// carry them in state, and `exportItem` does not serialize them. So a
+// document's note goes on the photo it opens with. `photo` must be given —
+// without it the command falls back to whatever the user has selected.
+export const createNote = ({ photo, text }) =>
+  ({
+    type: NOTE.CREATE,
+    payload: { photo, text },
+    meta: { cmd: 'project', history: 'add' }
+  })
 
 export const addTag = (payload) =>
   ({ type: ITEM.TAG.CREATE, payload, meta: { ...CMD } })
@@ -46,7 +61,6 @@ export const PROPERTIES = {
   type: DC + 'type',
   creator: DC + 'creator',
   recipient: DCTERMS + 'audience',
-  description: DC + 'description',
   // The *property* is dc:date, the same one the dossier and the templates
   // use, so a document's own date replaces the date it inherited. What makes
   // "1777-1778" or "an 11" parse is the *datatype* below — tropy#date is a

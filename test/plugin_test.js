@@ -122,7 +122,9 @@ function fakeProject({ shape = { 1: [11, 12, 13, 14] }, metadata = {} } = {}) {
   let next = 100
   let listeners = []
 
-  let state = { items: {}, photos: {}, metadata: { ...metadata }, tags: {} }
+  let state = {
+    items: {}, photos: {}, metadata: { ...metadata }, tags: {}, notes: {}
+  }
 
   for (let [id, photos] of Object.entries(shape)) {
     state.items[id] = { id: Number(id), photos: [...photos], tags: [] }
@@ -209,6 +211,22 @@ function fakeProject({ shape = { 1: [11, 12, 13, 14] }, metadata = {} } = {}) {
                 ...state.metadata[id], ...action.payload.data
               }
             break
+          case 'note.create': {
+            // Tropy attaches notes to photos, and requires an explicit photo —
+            // without one the command falls back to the user's selection.
+            let { photo, text } = action.payload
+            if (photo == null)
+              throw new Error('note.create needs an explicit photo')
+            if (!text)
+              throw new Error('note.create needs text')
+            let id = ++next
+            state.notes = { ...state.notes, [id]: { id, text } }
+            state.photos[photo] = {
+              ...state.photos[photo],
+              notes: [...(state.photos[photo].notes ?? []), id]
+            }
+            break
+          }
           case 'tag.create': {
             let id = ++next
             state.tags[id] = { id, name: action.payload.name }
@@ -271,9 +289,17 @@ describe('apply', () => {
     assert.equal(
       state.metadata[created[0]][date].type, 'https://tropy.org/v1/tropy#date')
 
-    // Confidence is recorded where a reader will see it.
+    // Commentary is a Tropy note on the photo the document opens with, not a
+    // metadata field: dc:description is left for descriptive metadata.
     let description = 'http://purl.org/dc/elements/1.1/description'
-    assert.match(state.metadata[created[1]][description].text, /confidence: low/)
+    assert.equal(state.metadata[created[1]][description], undefined)
+
+    let notes = Object.values(state.notes)
+    assert.equal(notes.length, 1, 'only the uncertain document gets a note')
+    assert.match(notes[0].text, /unclear/)
+    assert.match(notes[0].text, /low<\/em> confidence/)
+    assert.ok(state.photos[13].notes.includes(notes[0].id),
+      'the note is on the first photo of that document')
 
     let tag = Number(Object.keys(state.tags)[0])
     for (let id of created) assert.ok(state.items[id].tags.includes(tag))
@@ -461,7 +487,7 @@ describe('metadata datatypes', () => {
     await apply(store, { items: [1], documents, reviewTag: null })
 
     let values = Object.values(seen.data)
-    assert.ok(values.length >= 5)
+    assert.ok(values.length >= 4)
     assert.ok(values.every(v => typeof v.type === 'string' && v.type))
 
     // The date goes on dc:date — the property the dossier and templates use,
@@ -778,5 +804,69 @@ describe('apply, over a selection that mixes both shapes', () => {
     assert.equal(
       store.getState().metadata[items[0]][TITLE].text,
       'What the model called it')
+  })
+})
+
+describe('notes on the created items', () => {
+  const run = async (doc, options = {}) => {
+    let store = fakeStore()
+    let documents = resolve({ documents: [{ first: 1, last: 2, ...doc }] },
+      [11, 12, 13, 14])
+    let result = await apply(store,
+      { items: [1], documents, reviewTag: null, ...options })
+    return { store, result, notes: Object.values(store.getState().notes) }
+  }
+
+  it('says nothing when there is nothing to say', async () => {
+    let { notes, result } = await run({ title: 'Letter', confidence: 'high' })
+    assert.deepEqual(notes, [])
+    assert.equal(result.notes, 0)
+  })
+
+  it('records an uncertain reading even with no remark', async () => {
+    let { notes } = await run({ title: 'Letter', confidence: 'medium' })
+    assert.equal(notes.length, 1)
+    assert.match(notes[0].text, /medium<\/em> confidence/)
+  })
+
+  it('carries the remark, and counts what it wrote', async () => {
+    let { notes, result } = await run({
+      title: 'Letter', confidence: 'low', note: 'The day of the month is illegible.'
+    })
+    assert.equal(result.notes, 1)
+    assert.match(notes[0].text, /The day of the month is illegible\./)
+  })
+
+  it('escapes the model\'s text rather than trusting it as HTML', async () => {
+    let { notes } = await run({
+      title: 'Letter', confidence: 'low', note: 'Torn <leaf> & bound "tight"'
+    })
+    assert.match(notes[0].text, /Torn &lt;leaf&gt; &amp; bound/)
+    assert.ok(!notes[0].text.includes('<leaf>'))
+  })
+
+  it('tags the uncertain documents so they can be found', async () => {
+    let store = fakeStore()
+    let documents = resolve({
+      documents: [
+        { first: 1, last: 2, title: 'Sure', confidence: 'high' },
+        { first: 3, last: 4, title: 'Unsure', confidence: 'low' }
+      ]
+    }, [11, 12, 13, 14])
+
+    let { items } = await apply(store, {
+      items: [1], documents, reviewTag: 'for review',
+      lowConfidenceTag: 'low confidence'
+    })
+
+    let state = store.getState()
+    let byName = Object.fromEntries(
+      Object.values(state.tags).map(t => [t.name, t.id]))
+
+    assert.ok(state.items[items[1]].tags.includes(byName['low confidence']))
+    assert.ok(!state.items[items[0]].tags.includes(byName['low confidence']))
+    // The review tag still goes on everything.
+    for (let id of items)
+      assert.ok(state.items[id].tags.includes(byName['for review']))
   })
 })

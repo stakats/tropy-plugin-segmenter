@@ -84,6 +84,7 @@ through Claude Opus 5.
 | Output $ / MTok | `0` | Set both to price against another tariff |
 | Collection notes | — | A Markdown file of your own; see below |
 | Tag | `for review` | Applied to every item created |
+| Tag for uncertain documents | `low confidence` | Applied only where the reading is doubtful |
 | Dry run | off | Report the plan and change nothing |
 
 Defaults come from `segmentation.json`; anything set here overrides them.
@@ -199,6 +200,26 @@ example — French colonial personnel dossiers on microfilm — to point at or c
 Notes are additive: they make the policy concrete, and where they are silent it
 still applies. They are also never load-bearing, so a missing, empty or
 oversized file is logged and the run continues on the built-in policy alone.
+
+## Notes and confidence
+
+What the model *recorded* about a document goes in its metadata. What it has to
+*say* about it — an illegible date, a doubtful correspondent, a document running
+past the end of the selection — becomes a **Tropy note**, attached to the photo
+the document opens with. Notes belong to photos rather than items in Tropy, so
+that is as close to the item as a note can get.
+
+This used to be crammed into `dc:description`, which put prose in a field sized
+for a value and mixed a remark to the reader in with descriptive metadata.
+
+A document read with anything less than full confidence gets that recorded in
+its note, and is tagged separately — by default `low confidence`. Everything
+created gets the review tag, so the review tag cannot tell you where to look;
+this one can.
+
+The dialog at the end is a summary, not a transcript. An earlier version listed
+every note in it, and on a dossier of seventeen documents it outgrew the screen
+and took its own OK button with it.
 
 ## Cost
 

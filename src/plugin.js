@@ -20,7 +20,12 @@ const FROM_SETTINGS = {
 }
 
 function defaults() {
-  let out = { model: 'claude-opus-5', effort: 'high', dryRun: false }
+  let out = {
+    model: 'claude-opus-5',
+    effort: 'high',
+    dryRun: false,
+    lowConfidenceTag: 'low confidence'
+  }
 
   for (let [option, setting] of Object.entries(FROM_SETTINGS)) {
     if (DEFAULTS[setting] != null) out[option] = DEFAULTS[setting]
@@ -139,6 +144,7 @@ export default class SegmenterPlugin {
         items: selection,
         documents,
         reviewTag: this.options.reviewTag,
+        lowConfidenceTag: this.options.lowConfidenceTag,
         logger
       })
 
@@ -232,36 +238,53 @@ export default class SegmenterPlugin {
     return { manifest, usage }
   }
 
+  // A summary, deliberately. An earlier version listed every document's note
+  // here, and on a dossier of seventeen the dialog grew past the screen and
+  // took its own OK button with it. The notes now live on the items, where
+  // they can be read at leisure; this says what happened and where to look.
   report(dialog, documents, manifest, {
-    items, warnings = [], dryRun, cost
+    items, notes = 0, warnings = [], dryRun, cost
   } = {}) {
-    let low = documents.filter(d => d.confidence === 'low')
-    let notes = documents.filter(d => d.note)
+    let uncertain = documents.filter(
+      d => d.confidence && d.confidence !== 'high').length
 
-    let detail = [
-      `${documents.length} documents`,
+    let lines = [
+      `${documents.length} documents from ${
+        manifest.unassigned.length + documents.reduce(
+          (n, d) => n + d.photos.length, 0)} photos`,
       manifest.unassigned.length > 0 ?
-        `${manifest.unassigned.length} pages left unassigned (covers, labels)` :
+        `${manifest.unassigned.length} left unassigned — covers, labels, targets` :
         null,
-      low.length > 0 ? `${low.length} at low confidence` : null,
+      uncertain > 0 ?
+        `${uncertain} uncertain, tagged "${this.options.lowConfidenceTag}"` :
+        null,
+      (!dryRun && notes > 0) ?
+        `${notes} notes attached, on the first photo of each` :
+        null,
       manifest.openAtEnd ?
-        'the last document is still open at the final photo' : null,
-      cost ? `\nActual cost: ${cost}` : null,
-      notes.length > 0 ?
-        `\nNotes:\n${notes.map(d => `• p${d.first}: ${d.note}`).join('\n')}` :
+        'The last document is still open at the final photo — it runs past ' +
+        'the end of what was selected.' :
         null,
-      warnings.length > 0 ?
-        `\nThe segmentation itself is complete, but:\n${
-          warnings.map(w => `• ${w}`).join('\n')}` :
-        null
-    ].filter(Boolean).join('\n')
+      cost ? `\nActual cost: ${cost}` : null
+    ].filter(Boolean)
+
+    if (warnings.length > 0) {
+      // Truncated, for the same reason the notes are not listed.
+      let shown = warnings.slice(0, 5)
+
+      lines.push(
+        `\nThe segmentation is complete, but:\n${
+          shown.map(w => `• ${w}`).join('\n')}${
+          warnings.length > shown.length ?
+            `\n• and ${warnings.length - shown.length} more, in the log` : ''}`)
+    }
 
     return dialog.show('message-box', {
       type: 'info',
       message: dryRun ?
-        'Segmentation plan (nothing was changed)' :
-        `${items.length} documents`,
-      detail
+        `${documents.length} documents found (nothing was changed)` :
+        `Segmented into ${items.length} items`,
+      detail: lines.join('\n')
     })
   }
 }
