@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve as resolvePath, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -27,6 +28,8 @@ function policy() {
     load(source) {
       if (source !== `\0${id}`) return null
 
+      const pkg = JSON.parse(
+        readFileSync(resolvePath(root, 'package.json'), 'utf-8'))
       const md = readFileSync(resolvePath(root, 'segmentation.md'), 'utf-8')
       const recording = readFileSync(resolvePath(root, 'metadata.md'), 'utf-8')
       const settings = JSON.parse(
@@ -36,14 +39,26 @@ function policy() {
       const defaults = Object.fromEntries(
         Object.entries(settings).filter(([k]) => !k.startsWith('_')))
 
+      this.addWatchFile(resolvePath(root, 'package.json'))
       this.addWatchFile(resolvePath(root, 'segmentation.md'))
       this.addWatchFile(resolvePath(root, 'metadata.md'))
       this.addWatchFile(resolvePath(root, 'segmentation.json'))
 
+      // A short digest of each policy, so an item's note can say which rules
+      // it was segmented under. The policies are the prompt: without this,
+      // "was this judged under the current policy?" has no answer.
+      const digest = (text) =>
+        createHash('sha256').update(text).digest('hex').slice(0, 8)
+
       return [
         `export const POLICY = ${JSON.stringify(md)}`,
         `export const RECORDING = ${JSON.stringify(recording)}`,
-        `export const DEFAULTS = ${JSON.stringify(defaults)}`
+        `export const DEFAULTS = ${JSON.stringify(defaults)}`,
+        `export const VERSION = ${JSON.stringify(pkg.version)}`,
+        `export const DIGESTS = ${JSON.stringify({
+          segmentation: digest(md),
+          metadata: digest(recording)
+        })}`
       ].join('\n')
     }
   }

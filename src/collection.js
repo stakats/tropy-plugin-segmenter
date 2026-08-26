@@ -7,14 +7,19 @@
 // the Collection notes preference at, so it can be edited in a real editor,
 // kept under version control and shared, without rebuilding anything.
 
+import { createHash } from 'node:crypto'
+import { basename } from 'node:path'
 import { readFile, stat } from 'node:fs/promises'
 
 // Large enough for a thorough set of notes, small enough that pointing the
 // preference at the wrong file cannot quietly triple the cost of every run.
 export const LIMIT = 32 * 1024
 
+// Returns `{ text, source }` — `source` naming the file and a short digest of
+// its contents, for the provenance note. Empty text means the built-in policy
+// stood alone.
 export async function readCollectionNotes(path, { logger, limit = LIMIT } = {}) {
-  if (!path) return ''
+  if (!path) return { text: '', source: null }
 
   try {
     let { size } = await stat(path)
@@ -28,17 +33,20 @@ export async function readCollectionNotes(path, { logger, limit = LIMIT } = {}) 
 
     if (!notes) {
       logger?.warn(`collection notes at ${path} are empty`)
-      return ''
+      return { text: '', source: null }
     }
 
-    logger?.info(`collection notes: ${notes.length} characters from ${path}`)
+    let digest = createHash('sha256').update(notes).digest('hex').slice(0, 8)
 
-    return notes
+    logger?.info(
+      `collection notes: ${notes.length} characters from ${path} (${digest})`)
+
+    return { text: notes, source: `${basename(path)} ${digest}` }
 
   } catch (err) {
     // Notes are an addition to a policy that already stands on its own, so a
     // bad path is worth saying out loud but not worth stopping for.
     logger?.warn(`could not read collection notes from ${path}: ${err.message}`)
-    return ''
+    return { text: '', source: null }
   }
 }

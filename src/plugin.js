@@ -1,4 +1,4 @@
-import { DEFAULTS } from 'virtual:policy'
+import { DEFAULTS, DIGESTS, VERSION } from 'virtual:policy'
 import { getStore, getPhotoSequence, getSelection } from './store.js'
 import { assertDistinct, planWindows, renderScans } from './scan.js'
 import { countInput, createClient, requestFor, segment } from './model.js'
@@ -7,6 +7,7 @@ import { languageName } from './locale.js'
 import { describe, rateFor } from './cost.js'
 import { typeVocabulary } from './vocabulary.js'
 import { readCollectionNotes } from './collection.js'
+import { MARKER } from './provenance.js'
 import { reconcile, resolve } from './manifest.js'
 import { apply } from './apply.js'
 
@@ -32,6 +33,16 @@ function defaults() {
   }
 
   return out
+}
+
+// Short, sortable, and enough to group one run's items together without
+// pretending to be a UUID.
+function runId() {
+  return Math.random().toString(16).slice(2, 10)
+}
+
+function timestamp() {
+  return new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
 }
 
 export default class SegmenterPlugin {
@@ -95,11 +106,11 @@ export default class SegmenterPlugin {
         logger?.info(`document types already in this project: ${
           vocabulary.map(({ term, count }) => `${term} (${count})`).join(', ')}`)
 
-      let notes = await readCollectionNotes(
+      let collection = await readCollectionNotes(
         this.options.collectionNotes, { logger })
 
       let requests = await this.prepare(
-        photos, { logger, sharp, language, vocabulary, notes })
+        photos, { logger, sharp, language, vocabulary, notes: collection.text })
       let input = await this.price(client, requests, logger)
 
       // Thinking is billed as output and scales with effort, so this is the
@@ -145,6 +156,7 @@ export default class SegmenterPlugin {
         documents,
         reviewTag: this.options.reviewTag,
         lowConfidenceTag: this.options.lowConfidenceTag,
+        provenance: this.provenance(state, selection, model, collection),
         logger
       })
 
@@ -161,6 +173,33 @@ export default class SegmenterPlugin {
         message: 'Could not segment this item',
         detail: err.message
       })
+    }
+  }
+
+  // Everything an item's note has to say about how it came to exist. Gathered
+  // once per run so that every item records the same run, and so that what is
+  // being written down is legible in one place.
+  provenance(state, selection, model, collection) {
+    let titles = Object.fromEntries(selection.map(id => [
+      id,
+      state.metadata[id]?.['http://purl.org/dc/elements/1.1/title']?.text
+    ]))
+
+    return {
+      marker: MARKER,
+      plugin: VERSION,
+      model: model.id,
+      effort: this.options.effort,
+      scanEdge: this.options.scanEdge,
+      digests: DIGESTS,
+      collection: collection.source,
+      runId: runId(),
+      at: timestamp(),
+      // Which source item a document came from, for a selection spanning many.
+      sourceOf: (doc) => {
+        let id = doc.source ?? selection[0]
+        return { id, title: titles[id] }
+      }
     }
   }
 

@@ -1,4 +1,5 @@
 import { dispatchAndWait } from './store.js'
+import { provenanceNote } from './provenance.js'
 import {
   explode, merge, addTag, createNote, saveMetadata,
   PROPERTIES, DATE_TYPE, TEXT_TYPE
@@ -19,28 +20,7 @@ function metadataFor(doc) {
   return data
 }
 
-const escape = (value) => String(value)
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
 
-// What the model has to say *about* a document, as opposed to what it recorded
-// about it. This used to be crammed into dc:description, which put prose in a
-// field sized for a value and conflated a remark to the reader with
-// descriptive metadata.
-function noteFor(doc) {
-  let paragraphs = []
-
-  if (doc.note) paragraphs.push(escape(doc.note))
-
-  if (doc.confidence && doc.confidence !== 'high')
-    paragraphs.push(
-      `Segmented at <em>${escape(doc.confidence)}</em> confidence.`)
-
-  if (paragraphs.length === 0) return null
-
-  return paragraphs.map(text => `<p>${text}</p>`).join('')
-}
 
 // Get every photo onto an item of its own, then merge each document's photos
 // back together.
@@ -54,8 +34,8 @@ function noteFor(doc) {
 // as a shell holding whatever it recorded. Both commands register undo.
 export async function apply(store, options) {
   let {
-    items: sources, documents, reviewTag, lowConfidenceTag, logger,
-    onProgress, timeout = 15000
+    items: sources, documents, reviewTag, lowConfidenceTag, provenance,
+    logger, onProgress, timeout = 15000
   } = options
 
   let assigned = documents.flatMap(doc => doc.photos)
@@ -171,16 +151,25 @@ export async function apply(store, options) {
     }
   }
 
-  // Notes go on the photo each document opens with, since notes belong to
-  // photos rather than to items.
+  // Every item gets a note, whether or not there is a remark to make: until
+  // Tropy can record that a value came from a model, the note is the only
+  // place that fact lives. Notes go on the photo each document opens with,
+  // since notes belong to photos rather than items. Re-running accumulates
+  // rather than replaces — overwriting provenance is the wrong instinct.
   let notes = 0
 
   for (let i = 0; i < documents.length; ++i) {
-    let html = noteFor(documents[i])
+    let doc = documents[i]
+    let html = provenance && provenanceNote(doc, {
+      ...provenance,
+      source: provenance.sourceOf(doc),
+      pages: doc.first === doc.last ?
+        `${doc.first}` : `${doc.first}-${doc.last}`
+    })
 
     if (!html) continue
 
-    let photo = documents[i].photos[0]
+    let photo = doc.photos[0]
     let before = store.getState().photos[photo]?.notes?.length ?? 0
 
     try {

@@ -8,6 +8,7 @@ import { languageName } from '../src/locale.js'
 import { costOf, describe as describeCost, formatCost, rateFor } from '../src/cost.js'
 import { typeVocabulary } from '../src/vocabulary.js'
 import { readCollectionNotes } from '../src/collection.js'
+import { MARKER, provenanceNote } from '../src/provenance.js'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -289,17 +290,10 @@ describe('apply', () => {
     assert.equal(
       state.metadata[created[0]][date].type, 'https://tropy.org/v1/tropy#date')
 
-    // Commentary is a Tropy note on the photo the document opens with, not a
-    // metadata field: dc:description is left for descriptive metadata.
+    // Commentary is a Tropy note, not a metadata field: dc:description is
+    // left for descriptive metadata.
     let description = 'http://purl.org/dc/elements/1.1/description'
     assert.equal(state.metadata[created[1]][description], undefined)
-
-    let notes = Object.values(state.notes)
-    assert.equal(notes.length, 1, 'only the uncertain document gets a note')
-    assert.match(notes[0].text, /unclear/)
-    assert.match(notes[0].text, /low<\/em> confidence/)
-    assert.ok(state.photos[13].notes.includes(notes[0].id),
-      'the note is on the first photo of that document')
 
     let tag = Number(Object.keys(state.tags)[0])
     for (let id of created) assert.ok(state.items[id].tags.includes(tag))
@@ -597,12 +591,16 @@ describe('readCollectionNotes', () => {
 
   it('reads the notes a user points at', async () => {
     let path = await write('notes.md', '# Collection\n\nRepublican dates stay.')
-    assert.match(await readCollectionNotes(path), /Republican dates stay\./)
+    let { text, source } = await readCollectionNotes(path)
+    assert.match(text, /Republican dates stay\./)
+    // The source names the file and digests it, for the provenance note.
+    assert.match(source, /^notes\.md [0-9a-f]{8}$/)
   })
 
   it('is absent when no file is configured', async () => {
-    assert.equal(await readCollectionNotes(''), '')
-    assert.equal(await readCollectionNotes(undefined), '')
+    assert.deepEqual(await readCollectionNotes(''), { text: '', source: null })
+    assert.deepEqual(
+      await readCollectionNotes(undefined), { text: '', source: null })
   })
 
   // Notes add to a policy that already stands on its own, so nothing here is
@@ -611,14 +609,16 @@ describe('readCollectionNotes', () => {
     let warned = []
     let logger = { warn: (m) => warned.push(m), info: () => {} }
 
-    assert.equal(
-      await readCollectionNotes(join(dir, 'nope.md'), { logger }), '')
+    assert.deepEqual(
+      await readCollectionNotes(join(dir, 'nope.md'), { logger }),
+      { text: '', source: null })
     assert.match(warned[0], /could not read collection notes/)
   })
 
   it('carries on when the file is empty', async () => {
     let path = await write('empty.md', '   \n\n  ')
-    assert.equal(await readCollectionNotes(path), '')
+    assert.deepEqual(
+      await readCollectionNotes(path), { text: '', source: null })
   })
 
   it('refuses a file large enough to distort every run', async () => {
@@ -626,7 +626,9 @@ describe('readCollectionNotes', () => {
     let logger = { warn: (m) => warned.push(m), info: () => {} }
     let path = await write('huge.md', 'x'.repeat(2000))
 
-    assert.equal(await readCollectionNotes(path, { logger, limit: 1000 }), '')
+    assert.deepEqual(
+      await readCollectionNotes(path, { logger, limit: 1000 }),
+      { text: '', source: null })
     assert.match(warned[0], /the limit is/)
   })
 })
@@ -807,45 +809,79 @@ describe('apply, over a selection that mixes both shapes', () => {
   })
 })
 
-describe('notes on the created items', () => {
-  const run = async (doc, options = {}) => {
-    let store = fakeStore()
-    let documents = resolve({ documents: [{ first: 1, last: 2, ...doc }] },
-      [11, 12, 13, 14])
-    let result = await apply(store,
-      { items: [1], documents, reviewTag: null, ...options })
-    return { store, result, notes: Object.values(store.getState().notes) }
+describe('the provenance note', () => {
+  const run = {
+    plugin: '0.2.6',
+    model: 'claude-opus-5',
+    effort: 'high',
+    scanEdge: 1024,
+    digests: { segmentation: '3f9a1c2b', metadata: 'b7e04255' },
+    collection: 'anom-serie-e.md 1d5c8890',
+    runId: '5f3a9c1e',
+    at: '2026-08-26 14:02 UTC',
+    source: { id: 4759, title: 'Ribet, Jacques-Antoine' },
+    pages: '4-7'
   }
 
-  it('says nothing when there is nothing to say', async () => {
-    let { notes, result } = await run({ title: 'Letter', confidence: 'high' })
-    assert.deepEqual(notes, [])
-    assert.equal(result.notes, 0)
+  it('is written even when there is nothing to remark on', () => {
+    let html = provenanceNote({ confidence: 'high' }, run)
+    assert.match(html, new RegExp(`marker: ${MARKER}`))
   })
 
-  it('records an uncertain reading even with no remark', async () => {
-    let { notes } = await run({ title: 'Letter', confidence: 'medium' })
-    assert.equal(notes.length, 1)
-    assert.match(notes[0].text, /medium<\/em> confidence/)
+  it('says what the model actually looked at', () => {
+    // The scan size is the fact that most affects how far to trust the record,
+    // and nothing else in Tropy records it.
+    assert.match(provenanceNote({}, run), /judged from 1024 px copies/)
+    assert.match(provenanceNote({}, run), /images: 1024 px longest edge/)
   })
 
-  it('carries the remark, and counts what it wrote', async () => {
-    let { notes, result } = await run({
-      title: 'Letter', confidence: 'low', note: 'The day of the month is illegible.'
-    })
-    assert.equal(result.notes, 1)
-    assert.match(notes[0].text, /The day of the month is illegible\./)
+  it('records which pages of which item, so it can be checked', () => {
+    let html = provenanceNote({}, run)
+    assert.match(html, /Pages 4-7 of Ribet, Jacques-Antoine/)
+    assert.match(html, /source: item 4759, pages 4-7/)
   })
 
-  it('escapes the model\'s text rather than trusting it as HTML', async () => {
-    let { notes } = await run({
-      title: 'Letter', confidence: 'low', note: 'Torn <leaf> & bound "tight"'
-    })
-    assert.match(notes[0].text, /Torn &lt;leaf&gt; &amp; bound/)
-    assert.ok(!notes[0].text.includes('<leaf>'))
+  it('digests the policies it was judged under', () => {
+    let html = provenanceNote({}, run)
+    assert.match(html, /policy: segmentation\.md 3f9a1c2b, metadata\.md b7e04255/)
+    assert.match(html, /collection notes: anom-serie-e\.md 1d5c8890/)
   })
 
-  it('tags the uncertain documents so they can be found', async () => {
+  it('leads with the remark, which is the part that may need acting on', () => {
+    let html = provenanceNote(
+      { note: 'The day of the month is illegible.', confidence: 'low' }, run)
+    assert.ok(html.indexOf('illegible') < html.indexOf('marker:'))
+    assert.match(html, /confidence: low/)
+  })
+
+  it('uses a blockquote, since notes have no headings or code blocks', () => {
+    let html = provenanceNote({}, run)
+    assert.match(html, /<blockquote><p>/)
+    assert.ok(!/<h[1-6]|<pre|<code/.test(html))
+  })
+
+  it('escapes the model\'s text rather than trusting it as HTML', () => {
+    let html = provenanceNote({ note: 'Torn <leaf> & "bound"' }, run)
+    assert.match(html, /Torn &lt;leaf&gt; &amp; /)
+    assert.ok(!html.includes('<leaf>'))
+  })
+
+  it('leaves out what it does not know', () => {
+    let html = provenanceNote({}, { ...run, collection: null, effort: null })
+    assert.ok(!html.includes('collection notes:'))
+    assert.match(html, /model: claude-opus-5<br>/)
+  })
+})
+
+describe('notes on the items apply creates', () => {
+  const provenance = {
+    plugin: '0.2.6', model: 'claude-opus-5', effort: 'high', scanEdge: 1024,
+    digests: { segmentation: 'aaaaaaaa', metadata: 'bbbbbbbb' },
+    collection: null, runId: 'run12345', at: '2026-08-26 14:02 UTC',
+    sourceOf: () => ({ id: 1, title: 'A dossier' })
+  }
+
+  it('writes one for every item, not only the doubtful ones', async () => {
     let store = fakeStore()
     let documents = resolve({
       documents: [
@@ -854,19 +890,48 @@ describe('notes on the created items', () => {
       ]
     }, [11, 12, 13, 14])
 
-    let { items } = await apply(store, {
-      items: [1], documents, reviewTag: 'for review',
-      lowConfidenceTag: 'low confidence'
+    let { items, notes } = await apply(store, {
+      items: [1], documents, reviewTag: null, provenance
     })
 
-    let state = store.getState()
-    let byName = Object.fromEntries(
-      Object.values(state.tags).map(t => [t.name, t.id]))
+    assert.equal(notes, 2)
+    assert.equal(items.length, 2)
 
-    assert.ok(state.items[items[1]].tags.includes(byName['low confidence']))
-    assert.ok(!state.items[items[0]].tags.includes(byName['low confidence']))
-    // The review tag still goes on everything.
-    for (let id of items)
-      assert.ok(state.items[id].tags.includes(byName['for review']))
+    let state = store.getState()
+    assert.equal(state.photos[11].notes.length, 1)
+    assert.equal(state.photos[13].notes.length, 1)
+    // On the photo each document opens with, not scattered across its pages.
+    assert.equal(state.photos[12].notes, undefined)
+  })
+
+  it('accumulates on a re-run rather than replacing', async () => {
+    let store = fakeStore({ 1: [11, 12] })
+    let documents = resolve(
+      { documents: [{ first: 1, last: 2, title: 'Letter' }] }, [11, 12])
+
+    await apply(store, { items: [1], documents, reviewTag: null, provenance })
+    // A second pass over the same photo, as a re-segmentation would do.
+    await apply(store, {
+      items: [store.getState().photos[11].item],
+      documents, reviewTag: null,
+      provenance: { ...provenance, runId: 'run67890' }
+    })
+
+    let notes = store.getState().photos[11].notes
+    assert.equal(notes.length, 2, 'provenance is added, never overwritten')
+
+    let texts = notes.map(id => store.getState().notes[id].text)
+    assert.ok(texts.some(t => t.includes('run12345')))
+    assert.ok(texts.some(t => t.includes('run67890')))
+  })
+
+  it('writes nothing when no provenance is supplied', async () => {
+    let store = fakeStore()
+    let documents = resolve(
+      { documents: [{ first: 1, last: 2, title: 'Letter' }] },
+      [11, 12, 13, 14])
+
+    let { notes } = await apply(store, { items: [1], documents, reviewTag: null })
+    assert.equal(notes, 0)
   })
 })

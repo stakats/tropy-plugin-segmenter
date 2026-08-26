@@ -201,21 +201,53 @@ Notes are additive: they make the policy concrete, and where they are silent it
 still applies. They are also never load-bearing, so a missing, empty or
 oversized file is logged and the run continues on the built-in policy alone.
 
-## Notes and confidence
+## Provenance notes
 
-What the model *recorded* about a document goes in its metadata. What it has to
-*say* about it — an illegible date, a doubtful correspondent, a document running
-past the end of the selection — becomes a **Tropy note**, attached to the photo
-the document opens with. Notes belong to photos rather than items in Tropy, so
-that is as close to the item as a note can get.
+**Every item this plugin creates gets a note** recording that a model made the
+judgement, and enough about the run to weigh it:
 
-This used to be crammed into `dc:description`, which put prose in a field sized
-for a value and mixed a remark to the reader in with descriptive metadata.
+> The day of the month is illegible.
+>
+> Pages 4–7 of Ribet, Jacques-Antoine, judged from 1024 px copies by
+> claude-opus-5.
+>
+> > marker: tropy-segmenter/1
+> > run: 5f3a9c1e, 2026-08-26 14:02 UTC
+> > plugin: 0.2.6
+> > model: claude-opus-5, effort high
+> > images: 1024 px longest edge
+> > source: item 4759, pages 4-7
+> > confidence: medium
+> > policy: segmentation.md 3f9a1c2b, metadata.md b7e04255
+> > collection notes: anom-serie-e.md 1d5c8890
 
-A document read with anything less than full confidence gets that recorded in
-its note, and is tagged separately — by default `low confidence`. Everything
-created gets the review tag, so the review tag cannot tell you where to look;
-this one can.
+This is a stand-in. Until Tropy can record that a value came from a model
+rather than from a person, a note is the only place that fact can live — so
+these notes are what a real provenance layer would eventually have to be
+migrated from. That shapes them:
+
+- **Self-contained.** They cannot point at a run record kept elsewhere: a
+  source item that gave up all its photos has none left to hold a note, and an
+  item exported on its own must still carry its own provenance. The `run` id is
+  what groups one run's items back together.
+- **Parseable.** The marker and the labels are fixed strings, and the labels
+  stay in English whatever language the remark is in.
+- **Honest about what was seen.** The scan size matters more than anything else
+  here. A date misread from a 1024 px copy is a different kind of error from one
+  misread at full resolution, and nothing else in Tropy records it.
+- **Digested, not described.** The prompt *is* `segmentation.md`, `metadata.md`
+  and your collection notes, so each is recorded with a short digest. Without
+  them, "was this item segmented under the current rules?" has no answer.
+
+Re-segmenting **adds** a note rather than replacing one. Overwriting provenance
+is the wrong instinct for provenance, and the run ids tell the passes apart.
+
+Tokens and cost are deliberately absent: they are facts about a run, and
+dividing them across documents would invent precision. They are in the log.
+
+Documents read with less than full confidence are also tagged — by default
+`low confidence`. Everything created gets the review tag, so the review tag
+cannot tell you where to look; this one can.
 
 The dialog at the end is a summary, not a transcript. An earlier version listed
 every note in it, and on a dossier of seventeen documents it outgrew the screen

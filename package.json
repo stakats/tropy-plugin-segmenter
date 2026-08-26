@@ -1,7 +1,7 @@
 {
   "name": "tropy-plugin-segmenter",
   "productName": "Segmenter",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Group a batch-scanned item's photos into document-level items",
   "author": {
     "name": "Corporation for Digital Scholarship",
