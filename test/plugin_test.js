@@ -519,20 +519,28 @@ describe('typeVocabulary', () => {
       terms.map((text, i) => [i, text == null ? {} : { [T]: { text } }]))
   })
 
-  it('ranks by how often the project uses a term', () => {
+  it('ranks by how often the project uses a term, and says how often', () => {
     assert.deepEqual(
       typeVocabulary(project('Report', 'Correspondence', 'Correspondence')),
-      ['Correspondence', 'Report'])
+      [{ term: 'Correspondence', count: 2 }, { term: 'Report', count: 1 }])
+  })
+
+  it('keeps the counts, so a convention outweighs a leftover', () => {
+    // The real case: one term in overwhelming use beside a small French tail.
+    let terms = Array(997).fill('Correspondence').concat(Array(15).fill('lettre'))
+    let [first, second] = typeVocabulary(project(...terms))
+    assert.deepEqual(first, { term: 'Correspondence', count: 997 })
+    assert.deepEqual(second, { term: 'lettre', count: 15 })
   })
 
   it('ignores blanks, missing values and untyped items', () => {
     assert.deepEqual(typeVocabulary(project('Report', '  ', null, undefined)),
-      ['Report'])
+      [{ term: 'Report', count: 1 }])
   })
 
   it('trims, but does not case-fold — the project decides its own style', () => {
     // Order between two terms used equally often is a tie, so assert the set.
-    let vocab = typeVocabulary(project(' Report ', 'report'))
+    let vocab = typeVocabulary(project(' Report ', 'report')).map(v => v.term)
     assert.equal(vocab.length, 2)
     assert.ok(vocab.includes('Report') && vocab.includes('report'))
   })

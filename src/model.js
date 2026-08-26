@@ -45,13 +45,21 @@ Tropy rather than to the record. This person works in ${language}, so write
 
 ## The vocabulary of this project
 ${vocabulary.length > 0 ? `
-These are the document types this project already uses:
+These are the document types this project already uses, with how many items
+carry each:
 
-${vocabulary.map(t => `- ${t}`).join('\n')}
+${vocabulary.map(({ term, count }) => `- ${term} — ${count}`).join('\n')}
 
-Use one whenever it fits, copying its wording and capitalisation exactly, so
-the field stays sortable. Coin a new term only when none of these describes the
-document, and then match the language and style of the list above.` : `
+Prefer an existing term to a new one, and a widely used term to a rarely used
+one: the counts are the evidence of what this project's convention actually is,
+and a term used once may be a leftover rather than a practice. Copy the wording
+and capitalisation exactly, so the field stays sortable.
+
+Coin a new term only when nothing above describes the document. A term you coin
+should be short and singular and match the language and style of the list, and
+should not carry a parenthetical gloss — anything that needs explaining belongs
+in \`note\`. Terms already in use are the project's business, whatever shape
+they are in.` : `
 This project has no document types recorded yet, so you are setting the
 convention. Keep the terms short, singular and consistent across the dossier,
 and in the language of the documents.`}

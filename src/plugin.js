@@ -88,7 +88,7 @@ export default class SegmenterPlugin {
 
       if (vocabulary.length > 0)
         logger?.info(`document types already in this project: ${
-          vocabulary.join(', ')}`)
+          vocabulary.map(({ term, count }) => `${term} (${count})`).join(', ')}`)
 
       let notes = await readCollectionNotes(
         this.options.collectionNotes, { logger })

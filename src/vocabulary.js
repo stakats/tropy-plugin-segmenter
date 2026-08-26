@@ -9,6 +9,10 @@
 
 const DC_TYPE = 'http://purl.org/dc/elements/1.1/type'
 
+// Returns `[{ term, count }]`, commonest first. The counts matter as much as
+// the terms: a project that has used one word a thousand times and another
+// twice has a convention and a footnote, and a bare list makes them look
+// equally established.
 export function typeVocabulary(state, { limit = 12, min = 1 } = {}) {
   let counts = new Map()
 
@@ -29,5 +33,5 @@ export function typeVocabulary(state, { limit = 12, min = 1 } = {}) {
     // and ties break alphabetically rather than by insertion order.
     .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))
     .slice(0, limit)
-    .map(([term]) => term)
+    .map(([term, count]) => ({ term, count }))
 }
