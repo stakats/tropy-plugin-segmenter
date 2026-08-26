@@ -34,15 +34,21 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_ENV"
 
-      # The zip is named from package.json, never from the tag: Tropy strips a
-      # trailing `-1.2.3` to name the installed folder, and that pattern needs
-      # a digit after the dash, so a `v` would survive into the folder name.
+      # Builds the archive and checks it is installable: one top-level
+      # directory, the six files Tropy needs, no runtime dependencies, and the
+      # export hook declared.
+      #
+      # The name comes from package.json, never from the tag. Tropy strips a
+      # trailing `-1.2.3` to name the installed folder and that pattern needs a
+      # digit after the dash, so a `v` would survive into the folder name.
       - run: npm run dist
 
       - name: Publish
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/tropy-plugin-segmenter-${{ env.version }}.zip
+          files: |
+            dist/tropy-plugin-segmenter-${{ env.version }}.zip
+            dist/SHA256SUMS
           prerelease: true
           generate_release_notes: true
           body: |

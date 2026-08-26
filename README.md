@@ -339,65 +339,37 @@ reporting results only through state. No model and no Tropy needed to run them.
 ## Developing
 
 ```bash
-npm install && npm run build
+npm install
+npm test          # lint, build, and the unit tests
+npm run dist      # build, package, and check the archive is installable
 ```
 
-`npm run build` inlines `segmentation.md`, `metadata.md`, `segmentation.json`
-and `pricing.json` into the bundle, so **revising a policy means rebuilding
-the plugin**. That is the intended workflow: the policies are expected to change
-far more often than the code.
+`npm run dist` writes `dist/tropy-plugin-segmenter-<version>.zip` and a
+`SHA256SUMS` beside it, then runs `scripts/verify-dist.sh` over the result. That
+check exists because every invariant in it has been got wrong at least once:
+one top-level directory named for the version, exactly the six files Tropy
+needs, no `src/` or `node_modules`, a bundle that requires nothing at run time,
+and a `package.json` declaring the export hook and a required API key. A plugin
+that fails to install is as broken as one that fails its tests, so CI runs it
+on every push.
 
-### Packaging
-
-```bash
-npm run dist
-```
-
-That writes `dist/tropy-plugin-segmenter-<version>.zip`, the same artifact
-the release workflow publishes.
-
-The bundle is self-contained — no `require`, no `node_modules`, no `src` — so
-the zip carries only `index.js`, `package.json`, `icon.svg`, `LICENSE` and
-`third-party-licenses.txt`. Tropy never installs a plugin's dependencies, which
-is why `@anthropic-ai/sdk` is a *dev* dependency here: rollup inlines it.
-
-The zip must be named `<name>-<version>.zip` and hold one folder of the same
-name. Do not prefix the version with `v`: Tropy strips a trailing `-1.2.3` from
-the filename to name the installed folder, and that pattern only matches a dash
-followed by digits — `-v0.1.0` would survive into the folder name.
-
-During development you can skip the zip and copy `index.js`, `package.json` and
-`icon.svg` straight into the plugins folder.
-
-**Tropy must be fully quit and relaunched to pick up a new build.** Plugins are
-loaded with a plain `import(spec.main)` and the ES module cache is keyed by URL,
-so replacing `index.js` at the same path changes nothing until the process
-restarts — and reinstalling through the UI does not help, because the path is
-the same.
-
-Bump the version on every change — `npm run bump` — so the build that is
-actually loaded can be read off Preferences → Plugins, which shows
-`productName` and `version`.
-
-There is a catch that makes this worth stating precisely: the version comes
-from a **rescan** of `package.json`, while the code comes from the **module
-cache**. A plugins reload without an app restart rescans the spec but re-uses
-the cached module, so the panel would show the new version while the old code
-is still running. Always restart, and the two agree.
+To try a build in Tropy, copy the archive's contents into the plugins folder —
+or install the zip through Preferences. **Tropy must be fully quit and
+relaunched**: plugin modules are cached by URL, so a new build at the same path
+is otherwise invisible. Bump the version (`npm run bump`) so the build actually
+loaded can be read off Preferences → Plugins.
 
 ### Releasing
 
-Tag and push; `.github/workflows/release.yml` builds, tests, packages and
-publishes a prerelease with the zip attached.
+Tag the commit and push the tag:
 
 ```bash
-npm run bump          # or edit the version by hand
-git commit -am "..." && git push
-git tag -a v0.2.1 -m "..." && git push origin v0.2.1
+git tag v$(node -p "require('./package.json').version") && git push --tags
 ```
 
-The workflow refuses to run if the tag and `package.json` disagree, so a
-release can never be named one thing and contain another.
+`release.yml` refuses to publish if the tag and `package.json` disagree, then
+lints, tests, packages, verifies, and attaches the archive and its checksum to
+a GitHub release. Releases are marked prerelease while the plugin is at 0.x.
 
 ## License
 

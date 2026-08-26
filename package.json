@@ -15,8 +15,9 @@
     "lint": "eslint --color src test",
     "pretest": "npm run build",
     "test": "npm run lint && mocha test",
-    "dist": "npm run build && bash scripts/dist.sh",
-    "bump": "npm version patch --no-git-tag-version"
+    "dist": "npm run build && bash scripts/dist.sh && npm run verify",
+    "bump": "npm version patch --no-git-tag-version",
+    "verify": "bash scripts/verify-dist.sh"
   },
   "keywords": [
     "tropy",
@@ -93,7 +94,7 @@
       "label": "Collection notes (Markdown file)",
       "type": "file",
       "required": false,
-      "hint": "What is true of this collection but not of archives generally — its calendar, its document types, how its covers and surrogates behave. Appended to the built-in policy at run time."
+      "hint": "What is true of this collection but not of archives generally \u2014 its calendar, its document types, how its covers and surrogates behave. Appended to the built-in policy at run time."
     },
     {
       "field": "reviewTag",

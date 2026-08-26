@@ -25,4 +25,12 @@ cp index.js package.json icon.svg third-party-licenses.txt LICENSE COPYRIGHT "$S
 
 (cd dist && zip -qr "$NAME-$VERSION.zip" "$NAME-$VERSION")
 
+# A checksum, so a download can be told apart from a re-zip. sha256sum on
+# Linux, shasum on macOS.
+if command -v sha256sum >/dev/null; then
+  (cd dist && sha256sum "$NAME-$VERSION.zip" > SHA256SUMS)
+else
+  (cd dist && shasum -a 256 "$NAME-$VERSION.zip" > SHA256SUMS)
+fi
+
 echo "dist/$NAME-$VERSION.zip"

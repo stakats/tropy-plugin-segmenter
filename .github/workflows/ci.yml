@@ -21,3 +21,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+
+      # Build and check the archive on every push: a plugin that fails to
+      # install is as broken as one that fails its tests, and nothing else
+      # would notice until a release.
+      - run: npm run dist
