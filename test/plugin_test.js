@@ -2,6 +2,7 @@ import assert from 'node:assert'
 import { assertDistinct, planWindows } from '../src/scan.js'
 import { reconcile, resolve } from '../src/manifest.js'
 import { apply } from '../src/apply.js'
+import { reportText } from '../src/report.js'
 import { getPhotoSequence, getSelection } from '../src/store.js'
 import { isUsable, verify } from '../src/verify.js'
 import { languageName } from '../src/locale.js'
@@ -1212,5 +1213,65 @@ describe('the note on a run that spans several items', () => {
       ...base, sources: [{ id: 10, title: 'Ribet', grouped: true }]
     })
     assert.ok(!html.includes('assembled:'))
+  })
+})
+
+describe('reportText', () => {
+  const documents = [
+    { first: 1, last: 2, photos: [11, 12], confidence: 'high' },
+    { first: 3, last: 3, photos: [13], confidence: 'low' }
+  ]
+  const manifest = { unassigned: [14], openAtEnd: false }
+
+  const dry = (extra = {}) => reportText(documents, manifest, {
+    dryRun: true, cost: '$0.12 (3.0k in, 0.4k out)', ...extra
+  })
+
+  it('leads with the fact that nothing changed', () => {
+    let { message, detail } = dry()
+
+    assert.match(message, /^Dry run —/)
+    assert.match(message, /nothing changed/)
+    // Not buried at the end, and it says how to change it.
+    assert.match(detail.split('\n')[0], /Nothing in your project was changed/)
+    assert.match(detail, /Turn off "Dry run"/)
+  })
+
+  // The report a colleague saw claimed tags that a dry run never applies.
+  it('never claims to have done something in a dry run', () => {
+    let { detail } = dry({ notes: 3 })
+
+    assert.match(detail, /would be tagged/)
+    assert.doesNotMatch(detail, /\buncertain, tagged\b/)
+    assert.doesNotMatch(detail, /notes attached/)
+  })
+
+  it('reports what a dry run cost, because it is billed like any other', () => {
+    assert.match(dry().detail, /Actual cost: \$0\.12/)
+  })
+
+  it('claims the change only when it made one', () => {
+    let { message, detail } = reportText(documents, manifest, {
+      items: [101, 102], notes: 2, cost: '$0.12 (3.0k in, 0.4k out)'
+    })
+
+    assert.equal(message, 'Segmented into 2 items')
+    assert.match(detail, /1 uncertain, tagged "low confidence"/)
+    assert.match(detail, /2 notes attached/)
+    assert.doesNotMatch(detail, /Nothing in your project/)
+    assert.doesNotMatch(detail, /would be tagged/)
+  })
+
+  it('counts unassigned photos in the total', () => {
+    assert.match(dry().detail, /2 documents from 4 photos/)
+  })
+
+  it('truncates a long list of warnings', () => {
+    let warnings = Array.from({ length: 8 }, (_, i) => `problem ${i + 1}`)
+    let { detail } = reportText(documents, manifest, { items: [1], warnings })
+
+    assert.match(detail, /• problem 5/)
+    assert.doesNotMatch(detail, /• problem 6/)
+    assert.match(detail, /and 3 more, in the log/)
   })
 })

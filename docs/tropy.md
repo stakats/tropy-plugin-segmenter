@@ -152,6 +152,26 @@ full Node (`sandbox: false`, `src/main/wm.js:47-50`).
   `400` with no `access-control-allow-origin`; with it, `200` and `*`. The SDK
   does not send it.
 
+## Which Tropy this needs
+
+**1.17.0 or newer — not the beta.** Checked field by field against the tags:
+
+| | |
+|---|---|
+| 1.14 and earlier | no `this.store` on the `Window` instance |
+| 1.15 – 1.16.2 | store and `sharp` present, but `src/main/menu.js` has no plugin injection at all, so an export plugin had nowhere to appear |
+| 1.17.0 – 1.17.3 | everything present |
+
+Explode and merge, the `{ids, data}` metadata payload, `item_id AS item` on
+photos, the no-argument `metadata.load()` on project open, the option types and
+zip install with `strip` were all in place by 1.17.0.
+
+The beta is not needed because the plugin does not use the REST API: what
+`api-explode-merge` adds — explode and merge routes, nav state, the `arrayLimit`
+fix — is exactly what working in process makes unnecessary.
+
+Nothing enforces this. See the fifth upstream ask below.
+
 ## Diagnosis
 
 `~/Library/Logs/Tropy*/tropy.log`, JSON per line. Tropy logs command failures
@@ -171,6 +191,12 @@ In the order they are worth doing:
    workaround.
 4. **Encrypted option storage** (Electron `safeStorage`). `readonly` without it
    is a locked door on a glass wall.
+5. **A minimum-version declaration a plugin can make and Tropy enforces.**
+   `scan()` reads a fixed set of fields from `package.json` and none of them
+   says which Tropy a plugin needs, so an incompatible plugin fails at whatever
+   it happens to touch first. The guard belongs in Tropy, checked once with a
+   clear message, rather than reimplemented by every plugin that cares — and
+   each one would only catch the capabilities its author thought of.
 
 Related, both open: `tropy#985` (explode, merge and nav routes for the REST
 API) and `tropy#984` (transcription state).

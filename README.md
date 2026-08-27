@@ -57,7 +57,8 @@ can only appear in the import, export, extract and transcribe menus, so the
 export menu is the only place an item-scoped action can live.
 
 **Turn Dry run on for your first go.** It reports what it would do and changes
-nothing.
+nothing — but it still sends the pages and is still billed, and you have to
+turn it off again to apply anything. Both dialogs say so.
 
 A run costs money, because it sends the pages to Anthropic. The confirmation
 dialog shows an estimate before anything is spent and the report shows what it

@@ -10,6 +10,7 @@ import { typeVocabulary } from './vocabulary.js'
 import { readCollectionNotes } from './collection.js'
 import { MARKER } from './provenance.js'
 import { folders, sortColumn } from './order.js'
+import { reportText } from './report.js'
 import { reconcile, resolve } from './manifest.js'
 import { apply } from './apply.js'
 
@@ -148,18 +149,27 @@ export default class SegmentPlugin {
 
       let go = await dialog.show('message-box', {
         type: 'question',
-        buttons: ['Cancel', 'Segment'],
+        buttons: ['Cancel', this.options.dryRun ? 'Dry run' : 'Segment'],
         defaultId: 1,
         cancelId: 0,
-        message: (selection.length === 1) ?
-          'Segment this item?' :
-          `Segment these ${selection.length} items?`,
+        message: this.options.dryRun ?
+          'Dry run: report the plan and change nothing?' :
+          ((selection.length === 1) ?
+            'Segment this item?' :
+            `Segment these ${selection.length} items?`),
         detail: [
           this.describeSelection(selection, photoIds, shape, model),
           '',
+          // A dry run still sends the pages and is still billed, which is the
+          // part people are surprised by — say it where the money is.
+          this.options.dryRun ?
+            'Dry run is on, so nothing in your project will change. The pages ' +
+            'are still sent and still billed.' :
+            null,
+          this.options.dryRun ? '' : null,
           `Estimated cost: ${cost}`,
           'Billed to your Anthropic API key.'
-        ].join('\n')
+        ].filter(line => line !== null).join('\n')
       })
 
       if (go.response !== 1) return
@@ -174,7 +184,10 @@ export default class SegmentPlugin {
         throw new Error('no documents were found in this item')
 
       if (this.options.dryRun) {
-        await this.report(dialog, documents, manifest, { dryRun: true })
+        await this.report(dialog, documents, manifest, {
+          dryRun: true,
+          cost: describe({ ...usage, rate, pricedOn: PRICING.updated })
+        })
         return
       }
 
@@ -360,49 +373,12 @@ export default class SegmentPlugin {
   // here, and on a dossier of seventeen the dialog grew past the screen and
   // took its own OK button with it. The notes now live on the items, where
   // they can be read at leisure; this says what happened and where to look.
-  report(dialog, documents, manifest, {
-    items, notes = 0, warnings = [], dryRun, cost
-  } = {}) {
-    let uncertain = documents.filter(
-      d => d.confidence && d.confidence !== 'high').length
-
-    let lines = [
-      `${documents.length} documents from ${
-        manifest.unassigned.length + documents.reduce(
-          (n, d) => n + d.photos.length, 0)} photos`,
-      manifest.unassigned.length > 0 ?
-        `${manifest.unassigned.length} left unassigned — covers, labels, targets` :
-        null,
-      uncertain > 0 ?
-        `${uncertain} uncertain, tagged "${this.options.lowConfidenceTag}"` :
-        null,
-      (!dryRun && notes > 0) ?
-        `${notes} notes attached, on the first photo of each` :
-        null,
-      manifest.openAtEnd ?
-        'The last document is still open at the final photo — it runs past ' +
-        'the end of what was selected.' :
-        null,
-      cost ? `\nActual cost: ${cost}` : null
-    ].filter(Boolean)
-
-    if (warnings.length > 0) {
-      // Truncated, for the same reason the notes are not listed.
-      let shown = warnings.slice(0, 5)
-
-      lines.push(
-        `\nThe segmentation is complete, but:\n${
-          shown.map(w => `• ${w}`).join('\n')}${
-          warnings.length > shown.length ?
-            `\n• and ${warnings.length - shown.length} more, in the log` : ''}`)
-    }
-
+  report(dialog, documents, manifest, outcome = {}) {
     return dialog.show('message-box', {
       type: 'info',
-      message: dryRun ?
-        `${documents.length} documents found (nothing was changed)` :
-        `Segmented into ${items.length} items`,
-      detail: lines.join('\n')
+      ...reportText(documents, manifest, {
+        ...outcome, lowConfidenceTag: this.options.lowConfidenceTag
+      })
     })
   }
 }
